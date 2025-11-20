@@ -12,7 +12,25 @@
 	    body {
 	        overflow-x: hidden;
 	    }
+
+		html, body {
+    	padding: 0;
+    	margin: 0;
+    	width: 100%;
+    	overflow-x: hidden;   /* 強制水平滾動隱藏 */
+	}
+
+	#intro .vanta-canvas {   /* 如果你能找到生成的 canvas class 名稱 */
+    	position: absolute;
+    	top: 0;
+    	left: 50%;
+    	transform: translateX(-50%);
+    	width: 100vw !important;
+   	 height: 100vh !important;
+	}
+
 	</style>
+	
 
 	<!-- three.js + VANTA Halo -->
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
@@ -119,3 +137,4 @@
 
 </body>
 </html>
+
