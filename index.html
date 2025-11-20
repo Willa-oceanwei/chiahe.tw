@@ -1,396 +1,245 @@
-<!DOCTYPE html>
-<html lang="zh-Hant">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>佳咊實業有限公司</title>
+<!DOCTYPE HTML>
+<!-- p5.js + three.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.0.0/p5.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r95/three.min.js"></script>
 
-<!-- 官方 Dimension CSS -->
-<link rel="stylesheet" href="https://html5up.net/uploads/demos/dimension/assets/css/main.css" />
-  
-<style>
-/* ===== 💫 VANTA 背景容器 ===== */
-#vanta-bg {
-  width: 100%;
-  min-height: 100vh;
-  position: relative;
-  overflow: hidden;
-}
+<!-- Vanta Halo -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vanta/0.5.16/vanta.halo.min.js"></script>
 
-/* 讓頁面內容浮在 Vanta 背景之上 */
-#vanta-bg > * {
-  position: relative;
-  z-index: 10;
-}
+<!--
+	Hyperspace by HTML5 UP
+	html5up.net | @ajlkn
+	Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+-->
+<html>
+	<head>
+		<title>Hyperspace by HTML5 UP</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+		<link rel="stylesheet" href="assets/css/main.css" />
+		<noscript><link rel="stylesheet" href="assets/css/noscript.css" /></noscript>
+	</head>
+	<body class="is-preload">
 
-/* ===== 原本自訂 CSS（背景已移除） ===== */
+		<!-- Sidebar -->
+		<section id="sidebar">
+			<div class="inner">
+				<nav>
+					<ul>
+						<li><a href="#intro">Welcome</a></li>
+						<li><a href="#one">Who we are</a></li>
+						<li><a href="#two">What we do</a></li>
+						<li><a href="#three">Get in touch</a></li>
+					</ul>
+				</nav>
+			</div>
+		</section>
 
-/* 全站淡入 */
-body {
-  margin: 0;
-  font-family: 'Arial', sans-serif;
-  opacity: 0;
-  animation: fadeIn 1.5s forwards;
-}
-@keyframes fadeIn { to { opacity: 1; } }
+		<!-- Wrapper -->
+		<div id="wrapper">
 
-/* Header */
-#header {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding-top: 80px;
-  z-index: 10;
-  opacity: 0;
-  animation: headerFadeIn 1.5s 0.5s forwards;
-}
-@keyframes headerFadeIn { to { opacity: 1; } }
+			<!-- Intro -->
+			<section id="intro" class="wrapper style1 fullscreen fade-up">
+				<div class="inner">
+					<h1>Hyperspace</h1>
+					<p>Just another fine responsive site template designed by 
+					<a href="http://html5up.net">HTML5 UP</a><br />
+					and released for free under the <a href="http://html5up.net/license">Creative Commons</a>.</p>
+					<ul class="actions">
+						<li><a href="#one" class="button scrolly">Learn more</a></li>
+					</ul>
+				</div>
+			</section>
 
-/* 禁用 Dimension transform */
-.logo-wrapper, 
-.logo-circle, 
-.diamond-shape {
-  transform: none !important;
-}
+			<!-- Halo Background Script -->
+			<script>
+				VANTA.HALO({
+					el: "#intro",
+					mouseControls: true,
+					touchControls: true,
+					gyroControls: false,
+					minHeight: 400.00,
+					minWidth: 400.00,
+					baseColor: 0xffffff,
+					backgroundColor: 0x000000,
+					amplitudeFactor: 1.2,
+					xOffset: 0.13,
+					yOffset: 0.32
+				});
 
-/* 圓形鑽石 */
-.logo-wrapper {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 0;
-  opacity: 0;
-  animation: logoFadeIn 1s 0.7s forwards;
-}
-.logo-circle {
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  background: rgba(0,0,0,0.3);
-  border: 2px solid #fff;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-.diamond-shape {
-  width: 50px;
-  height: 50px;
-  border: 3px solid #fff;
-  background: transparent;
-  transform: rotate(45deg) !important;
-}
+				// Avoid layout jump
+				window.onload = function () {
+					window.dispatchEvent(new Event("resize"));
+				};
+			</script>
 
-/* 標題 */
-header .content .inner {
-  text-align: center;
-  margin: 20px 0;
-  opacity: 0;
-  animation: titleFadeIn 1s 1s forwards;
-}
-header .content .inner h1 {
-  color: #fff;
-  font-size: 48px;
-  margin: 0;
-}
-header .content .inner p {
-  color: #fff;
-  font-size: 24px;
-  margin-top: 10px;
-}
+			<!-- One -->
+			<section id="one" class="wrapper style2 spotlights">
+				<section>
+					<a href="#" class="image"><img src="images/pic01.jpg" alt="" data-position="center center" /></a>
+					<div class="content">
+						<div class="inner">
+							<h2>Sed ipsum dolor</h2>
+							<p>Phasellus convallis elit id ullamcorper pulvinar. Duis aliquam turpis mauris, eu ultricies erat malesuada quis. Aliquam dapibus.</p>
+							<ul class="actions">
+								<li><a href="generic.html" class="button">Learn more</a></li>
+							</ul>
+						</div>
+					</div>
+				</section>
 
-/* T 字導覽列 */
-nav {
-  width: 60%;
-  margin: 0 auto;
-  opacity: 0;
-  animation: navFadeIn 1s 1.2s forwards;
-}
-nav ul.t-nav {
-  display: flex;
-  justify-content: space-between;
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-nav ul.t-nav li {
-  flex: 1;
-  text-align: center;
-}
-nav ul.t-nav li a {
-  color: #fff !important;
-  text-decoration: none;
-  font-weight: bold;
-  font-size: 18px;
-  padding: 10px 0;
-  display: block;
-  transition: 0.3s;
-}
-nav ul.t-nav li a:hover {
-  text-shadow: 0 0 7px rgba(255,255,255,0.9);
-}
+				<section>
+					<a href="#" class="image"><img src="images/pic02.jpg" alt="" data-position="top center" /></a>
+					<div class="content">
+						<div class="inner">
+							<h2>Feugiat consequat</h2>
+							<p>Phasellus convallis elit id ullamcorper pulvinar. Duis aliquam turpis mauris, eu ultricies erat malesuada quis. Aliquam dapibus.</p>
+							<ul class="actions">
+								<li><a href="generic.html" class="button">Learn more</a></li>
+							</ul>
+						</div>
+					</div>
+				</section>
 
-/* 彈窗 */
-.modal {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  width: 60%;
-  max-width: 700px;
-  transform: translate(-50%, -50%) scale(0.9);
-  background: rgba(0,0,0,0.8);
-  backdrop-filter: blur(12px);
-  padding: 30px;
-  border-radius: 16px;
-  text-align: center;
-  z-index: 9999;
-  opacity: 0;
-  transition: opacity 0.3s ease, transform 0.3s ease;
-  display: none;
-}
-.modal.show {
-  display: block;
-  opacity: 1;
-  transform: translate(-50%, -50%) scale(1);
-}
-.modal-header {
-  font-size: 28px;
-  color: #fff;
-  text-align: left;
-  font-weight: 700;
-  padding-bottom: 10px;
-  border-bottom: 2px solid rgba(255,255,255,0.25);
-  margin-bottom: 20px;
-}
-.modal-image img {
-  max-width: 80%;
-  border-radius: 8px;
-}
-.modal-content {
-  font-size: 18px;
-  color: #fff;
-  text-align: left;
-}
+				<section>
+					<a href="#" class="image"><img src="images/pic03.jpg" alt="" data-position="25% 25%" /></a>
+					<div class="content">
+						<div class="inner">
+							<h2>Ultricies aliquam</h2>
+							<p>Phasellus convallis elit id ullamcorper pulvinar. Duis aliquam turpis mauris, eu ultricies erat malesuada quis. Aliquam dapibus.</p>
+							<ul class="actions">
+								<li><a href="generic.html" class="button">Learn more</a></li>
+							</ul>
+						</div>
+					</div>
+				</section>
+			</section>
 
-/* 聯絡我們表單 */
-.contact-form {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
-.contact-form .form-row {
-  display: flex;
-  gap: 15px;
-}
-.contact-form input,
-.contact-form textarea {
-  padding: 10px;
-  border-radius: 6px;
-  border: 2px solid #fff;
-  font-size: 16px;
-  background: transparent;
-  color: #fff;
-  flex: 1;
-}
-.contact-form textarea { width: 100%; }
-.contact-form .button-group {
-  display: flex;
-  gap: 15px;
-}
-.contact-form button {
-  flex: 1;
-  padding: 10px;
-  border-radius: 6px;
-  font-weight: 700;
-  border: 2px solid #fff;
-  cursor: pointer;
-}
-#submitBtn {
-  background: rgba(255,255,255,0.85);
-  color: #000;
-}
-#resetBtn {
-  background: #000;
-  color: #fff;
-}
+			<!-- Two -->
+			<section id="two" class="wrapper style3 fade-up">
+				<div class="inner">
+					<h2>What we do</h2>
+					<p>Phasellus convallis elit id ullamcorper pulvinar. Duis aliquam turpis mauris, eu ultricies erat malesuada quis.</p>
+					<div class="features">
+						<section>
+							<span class="icon solid major fa-code"></span>
+							<h3>Lorem ipsum amet</h3>
+							<p>Phasellus convallis elit id ullam corper amet et pulvinar.</p>
+						</section>
+						<section>
+							<span class="icon solid major fa-lock"></span>
+							<h3>Aliquam sed nullam</h3>
+							<p>Phasellus convallis elit id ullam corper amet et pulvinar.</p>
+						</section>
+						<section>
+							<span class="icon solid major fa-cog"></span>
+							<h3>Sed erat ullam corper</h3>
+							<p>Phasellus convallis elit id ullam corper amet et pulvinar.</p>
+						</section>
+						<section>
+							<span class="icon solid major fa-desktop"></span>
+							<h3>Veroeros quis lorem</h3>
+							<p>Phasellus convallis elit id ullam corper amet et pulvinar.</p>
+						</section>
+						<section>
+							<span class="icon solid major fa-link"></span>
+							<h3>Urna quis bibendum</h3>
+							<p>Phasellus convallis elit id ullam corper amet et pulvinar.</p>
+						</section>
+						<section>
+							<span class="icon major fa-gem"></span>
+							<h3>Aliquam urna dapibus</h3>
+							<p>Phasellus convallis elit id ullam corper amet et pulvinar.</p>
+						</section>
+					</div>
+					<ul class="actions">
+						<li><a href="generic.html" class="button">Learn more</a></li>
+					</ul>
+				</div>
+			</section>
 
-.close-btn {
-  margin-top: 20px;
-  padding: 10px 25px;
-  font-size: 16px;
-  border-radius: 10px;
-  border: 2px solid rgba(255,255,255,0.5);
-  background: rgba(255,255,255,0.15);
-  color: #fff;
-  cursor: pointer;
-}
-.close-btn:hover {
-  background: rgba(255,255,255,0.3);
-}
+			<!-- Three -->
+			<section id="three" class="wrapper style1 fade-up">
+				<div class="inner">
+					<h2>Get in touch</h2>
+					<p>Phasellus convallis elit id ullamcorper pulvinar. Duis aliquam turpis mauris.</p>
+					<div class="split style1">
 
-/* 遮罩 */
-#overlay {
-  position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  background: rgba(0,0,0,0.3);
-  backdrop-filter: blur(5px);
-  z-index: 998;
-  opacity: 0;
-  transition: 0.3s;
-  display: none;
-}
-#overlay.show {
-  display: block;
-  opacity: 1;
-}
+						<section>
+							<form method="post" action="#">
+								<div class="fields">
+									<div class="field half">
+										<label for="name">Name</label>
+										<input type="text" name="name" id="name" />
+									</div>
+									<div class="field half">
+										<label for="email">Email</label>
+										<input type="text" name="email" id="email" />
+									</div>
+									<div class="field">
+										<label for="message">Message</label>
+										<textarea name="message" id="message" rows="5"></textarea>
+									</div>
+								</div>
+								<ul class="actions">
+									<li><a href="" class="button submit">Send Message</a></li>
+								</ul>
+							</form>
+						</section>
 
-/* Animations */
-@keyframes logoFadeIn { to { opacity: 1; } }
-@keyframes titleFadeIn { to { opacity: 1; } }
-@keyframes navFadeIn { to { opacity: 1; } }
-</style>
-</head>
+						<section>
+							<ul class="contact">
+								<li>
+									<h3>Address</h3>
+									<span>12345 Somewhere Road #654<br />
+									Nashville, TN 00000-0000<br />
+									USA</span>
+								</li>
+								<li>
+									<h3>Email</h3>
+									<a href="#">user@untitled.tld</a>
+								</li>
+								<li>
+									<h3>Phone</h3>
+									<span>(000) 000-0000</span>
+								</li>
+								<li>
+									<h3>Social</h3>
+									<ul class="icons">
+										<li><a href="#" class="icon brands fa-twitter"><span class="label">Twitter</span></a></li>
+										<li><a href="#" class="icon brands fa-facebook-f"><span class="label">Facebook</span></a></li>
+										<li><a href="#" class="icon brands fa-github"><span class="label">GitHub</span></a></li>
+										<li><a href="#" class="icon brands fa-instagram"><span class="label">Instagram</span></a></li>
+										<li><a href="#" class="icon brands fa-linkedin-in"><span class="label">LinkedIn</span></a></li>
+									</ul>
+								</li>
+							</ul>
+						</section>
 
-<body>
+					</div>
+				</div>
+			</section>
 
-<!-- 🌌 VANTA HALO 背景容器 -->
-<div id="vanta-bg">
+		</div>
 
-<header id="header">
-  <div class="logo-wrapper">
-    <div class="logo-circle">
-      <div class="diamond-shape"></div>
-    </div>
-  </div>
+		<!-- Footer -->
+		<footer id="footer" class="wrapper style1-alt">
+			<div class="inner">
+				<ul class="menu">
+					<li>&copy; Untitled. All rights reserved.</li>
+					<li>Design: <a href="http://html5up.net">HTML5 UP</a></li>
+				</ul>
+			</div>
+		</footer>
 
-  <div class="content">
-    <div class="inner">
-      <h1>佳咊實業有限公司</h1>
-      <p>你的顏色 獨一無二</p>
-    </div>
-  </div>
+		<!-- Scripts -->
+		<script src="assets/js/jquery.min.js"></script>
+		<script src="assets/js/jquery.scrollex.min.js"></script>
+		<script src="assets/js/jquery.scrolly.min.js"></script>
+		<script src="assets/js/browser.min.js"></script>
+		<script src="assets/js/breakpoints.min.js"></script>
+		<script src="assets/js/util.js"></script>
+		<script src="assets/js/main.js"></script>
 
-  <nav>
-    <ul class="t-nav">
-      <li><a href="#" onclick="openModal('intro')">關於佳咊</a></li>
-      <li><a href="#" onclick="openModal('work')">服務內容</a></li>
-      <li><a href="#" onclick="openModal('about')">產品介紹</a></li>
-      <li><a href="#" onclick="openModal('contact')">聯絡我們</a></li>
-    </ul>
-  </nav>
-</header>
-
-<div id="overlay"></div>
-
-<div class="modal" id="modalBox">
-  <div class="modal-header" id="modalTitle">標題</div>
-  <div id="modalContent">內容文字</div>
-  <div id="contactFormContainer"></div>
-  <button class="close-btn" onclick="closeModal()">關閉</button>
-</div>
-
-</div><!-- END #vanta-bg -->
-
-<!-- ===== Vanta HALO Scripts ===== -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.halo.min.js"></script>
-<script>
-VANTA.HALO({
-  el: "#vanta-bg",
-  mouseControls: true,
-  touchControls: true,
-  gyroControls: false,
-  minHeight: 200.00,
-  minWidth: 200.00,
-  backgroundAlpha: 0.0
-});
-</script>
-
-<!-- ===== Modal Scripts ===== -->
-<script>
-const modalData = {
-  intro: {
-    title: '關於佳咊',
-    content: '佳咊實業成立於1990年，專注於色粉、顏料與色彩應用開發。我們致力於提供穩定品質、創新配方與客製化服務。',
-    img: 'https://raw.githubusercontent.com/Willa-oceanwei/chiahe/main/assets/images/sample1.jpg'
-  },
-  work: {
-    title: '服務內容',
-    content: '・塑膠色粉調色  ・Pantone 色號比對  ・客製化顏色研發  ・技術諮詢與色彩管理',
-    img: 'https://raw.githubusercontent.com/Willa-oceanwei/chiahe/main/assets/images/modalData.work.img.jpg'
-  },
-  about: {
-    title: '產品介紹',
-    content: '我們提供： PE色母、PP色母、透明色粉、金蔥、珠光、特殊效果顏料（螢光、金屬色粉）',
-    img: 'https://raw.githubusercontent.com/Willa-oceanwei/chiahe/main/assets/images/sample3.jpg'
-  },
-  contact: {
-    title: '聯絡我們',
-    content: ''
-  }
-};
-
-function openModal(key){
-  const modal = document.getElementById('modalBox');
-  const overlay = document.getElementById('overlay');
-  const formContainer = document.getElementById('contactFormContainer');
-  const modalContent = document.getElementById('modalContent');
-
-  document.getElementById('modalTitle').innerHTML = modalData[key].title;
-
-  if (modalData[key].img){
-    modalContent.innerHTML = `
-      <div class="modal-image">
-        <img src="${modalData[key].img}" />
-      </div>
-      <div class="modal-text">${modalData[key].content}</div>
-    `;
-  } else {
-    modalContent.innerHTML = `<div class="modal-text">${modalData[key].content}</div>`;
-  }
-
-  if(key === 'contact'){
-    formContainer.innerHTML = `
-      <form class="contact-form">
-        <div class="form-row">
-          <input type="text" placeholder="姓名" required />
-          <input type="email" placeholder="信箱" required />
-        </div>
-        <textarea placeholder="訊息" rows="4" required></textarea>
-        <div class="button-group">
-          <button type="submit" id="submitBtn">傳送</button>
-          <button type="reset" id="resetBtn">重新填寫</button>
-        </div>
-      </form>
-    `;
-  } else {
-    formContainer.innerHTML = '';
-  }
-
-  overlay.style.display = 'block';
-  modal.style.display = 'block';
-  requestAnimationFrame(()=>{
-    overlay.classList.add('show');
-    modal.classList.add('show');
-  });
-}
-
-function closeModal(){
-  const modal = document.getElementById('modalBox');
-  const overlay = document.getElementById('overlay');
-  const formContainer = document.getElementById('contactFormContainer');
-
-  modal.classList.remove('show');
-  overlay.classList.remove('show');
-
-  setTimeout(()=>{
-    modal.style.display = 'none';
-    overlay.style.display = 'none';
-    formContainer.innerHTML = '';
-  }, 300);
-}
-
-document.getElementById('overlay').onclick = closeModal;
-</script>
-
-</body>
+	</body>
 </html>
