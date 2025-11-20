@@ -12,27 +12,30 @@
 </head>
 <body class="is-preload">
 
+	<!-- Sidebar -->
 	<section id="sidebar">
 		<div class="inner">
 			<nav>
 				<ul>
-					<li><a href="#intro">Welcome</a></li>
-					<li><a href="#one">Who we are</a></li>
-					<li><a href="#two">What we do</a></li>
-					<li><a href="#three">Get in touch</a></li>
+					<li><a href="#intro" class="scrolly">Welcome</a></li>
+					<li><a href="#one" class="scrolly">Who we are</a></li>
+					<li><a href="#two" class="scrolly">What we do</a></li>
+					<li><a href="#three" class="scrolly">Get in touch</a></li>
 				</ul>
 			</nav>
 		</div>
 	</section>
 
+	<!-- Main wrapper -->
 	<div id="wrapper">
 
+		<!-- Intro Section -->
 		<section id="intro" class="wrapper style1 fullscreen fade-up">
-			<div class="inner">
+			<div class="inner" style="position: relative; z-index: 2;">
 				<h1 style="font-size:38px;">佳咊實業有限公司</h1>
 				<p style="font-size:18px;">
-  				以40年顏料及添加劑應用經驗，在日益嚴格的環境法規下協助客戶達成多元化需求。<br />
-  				讓你的顏色   獨一無二。
+  					以40年顏料及添加劑應用經驗，在日益嚴格的環境法規下協助客戶達成多元化需求。<br />
+  					讓你的顏色獨一無二。
 				</p>
 				<ul class="actions">
 					<li><a href="#one" class="button scrolly">Learn more</a></li>
@@ -40,6 +43,7 @@
 			</div>
 		</section>
 
+		<!-- VANTA.HALO Script -->
 		<script>
 		VANTA.HALO({
     		el: "#intro",
@@ -48,41 +52,50 @@
     		gyroControls: false,
     		minHeight: 400.00,
    		 	minWidth: 400.00,
-    		baseColor: 0x001a59,        // 主球偏黃
-    		backgroundColor: 0x131a43,  // 深藍底
-    		size: 1,                    // 光暈大小
-    		amplitudeFactor: 2.2,       // 光暈能量（較官方逼近）
-    
-    		// ⭐ 讓球保持置中
+    		baseColor: 0x001a59,
+    		backgroundColor: 0x131a43,
+    		size: 1,
+    		amplitudeFactor: 2.2,
     		xOffset: 0.25,
     		yOffset: 0.1,
-
-    		// ⭐ 讓光暈往左發散（最關鍵）
     		lightDirectionX: -1.5,
     		lightDirectionY: 0.3,
-
     		autopilot: true,
     		speed: 1.0,
     		cohesion: 0.4
 		});
 
-		// 修正初次載入的位移跳動
+		// 修正初次載入位移跳動
 		window.onload = function () {
     		window.dispatchEvent(new Event("resize"));
 		};
 		</script>
 
+		<!-- Other Sections -->
 		<section id="one" class="wrapper style2 spotlights">
-			</section>
+			<div class="inner">
+				<h2>Who we are</h2>
+				<p>這裡放公司介紹內容。</p>
+			</div>
+		</section>
 
 		<section id="two" class="wrapper style3 fade-up">
-			</section>
+			<div class="inner">
+				<h2>What we do</h2>
+				<p>這裡放服務內容或產品介紹。</p>
+			</div>
+		</section>
 
 		<section id="three" class="wrapper style1 fade-up">
-			</section>
+			<div class="inner">
+				<h2>Get in touch</h2>
+				<p>這裡放聯絡資訊或表單。</p>
+			</div>
+		</section>
 
 	</div>
 
+	<!-- Footer -->
 	<footer id="footer" class="wrapper style1-alt">
 		<div class="inner">
 			<ul class="menu">
@@ -92,6 +105,7 @@
 		</div>
 	</footer>
 
+	<!-- Scripts -->
 	<script src="assets/js/jquery.min.js"></script>
 	<script src="assets/js/jquery.scrollex.min.js"></script>
 	<script src="assets/js/jquery.scrolly.min.js"></script>
@@ -100,16 +114,15 @@
 	<script src="assets/js/util.js"></script>
 	<script src="assets/js/main.js"></script>
 
+	<!-- 初始化 scrolly 平滑滾動 -->
+	<script>
+	$(document).ready(function() {
+		$('.scrolly').scrolly({
+			speed: 1000,
+			offset: 0
+		});
+	});
+	</script>
+
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
