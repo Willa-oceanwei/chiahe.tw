@@ -10,6 +10,16 @@
 	<!-- three.js + VANTA Halo -->
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/vanta/0.5.21/vanta.halo.min.js"></script>
+
+	<style>
+	/* 為疊加光球加上絕對定位 */
+	.halo-layer {
+	  position: absolute;
+	  top: 0; left: 0;
+	  width: 100%; height: 100%;
+	  z-index: -1;   /* 放到文字底下 */
+	}
+	</style>
 </head>
 <body class="is-preload">
 
@@ -32,6 +42,8 @@
 
 		<!-- Intro -->
 		<section id="intro" class="wrapper fullscreen fade-up">
+			<div id="halo1" class="halo-layer"></div>
+			<div id="halo2" class="halo-layer"></div>
 			<div class="inner">
 				<h1>Hyperspace</h1>
 				<p>Just another fine responsive site template designed by 
@@ -45,32 +57,41 @@
 
 		<!-- Initialize VANTA Halo -->
 		<script>
-		VANTA.HALO({
-  		el: "#intro",
-  		mouseControls: true,
-  		touchControls: true,
-  		gyroControls: false,
-  		minHeight: 400.00,
-  		minWidth: 400.00,
-  		baseColor: 0xffd166,      // 黃色球
-  		backgroundColor: 0x131a43, // 深藍背景
-  		size: 1.1,                   // 光暈大小
-		cohesion: 0.4,            // <--- 新增，降低凝聚度，使其更鬆散/柔和
-  		amplitudeFactor: 2.5,      // 光暈振幅加大
-  		xOffset: 0.2,              // 球水平位置 (0-1)
-  		yOffset: 0.2,              // 球垂直位置 (0-1)
-  		autopilot: true,
-  		speed: 1.0
-		});
+			// 第一顆 Halo 球
+			VANTA.HALO({
+				el: "#halo1",
+				baseColor: 0xffd166,        // 黃色球
+				backgroundColor: 0x131a43,  // 深藍背景
+				size: 1.1,
+				cohesion: 0.4,
+				amplitudeFactor: 2.5,
+				xOffset: 0.2,
+				yOffset: 0.2,
+				autopilot: true,
+				speed: 1.0
+			});
 
-// 避免初次載入 layout jump
-window.onload = function () {
-  window.dispatchEvent(new Event("resize"));
-};
-</script>
+			// 第二顆 Halo 球
+			VANTA.HALO({
+				el: "#halo2",
+				baseColor: 0x6ac1ff,        // 藍色球
+				backgroundColor: 0x000000,  // 黑色或透明層看不到背景
+				size: 0.9,
+				cohesion: 0.3,
+				amplitudeFactor: 1.8,
+				xOffset: 0.7,
+				yOffset: 0.35,
+				autopilot: true,
+				speed: 0.8
+			});
 
+			// 避免初次載入 layout jump
+			window.onload = function () {
+				window.dispatchEvent(new Event("resize"));
+			};
+		</script>
 
-		<!-- One -->
+		<!-- 以下保持原有的 One, Two, Three 內容 -->
 		<section id="one" class="wrapper style2 spotlights">
 			<section>
 				<a href="#" class="image"><img src="images/pic01.jpg" alt="" data-position="center center" /></a>
@@ -110,7 +131,6 @@ window.onload = function () {
 			</section>
 		</section>
 
-		<!-- Two -->
 		<section id="two" class="wrapper style3 fade-up">
 			<div class="inner">
 				<h2>What we do</h2>
@@ -153,7 +173,6 @@ window.onload = function () {
 			</div>
 		</section>
 
-		<!-- Three -->
 		<section id="three" class="wrapper style1 fade-up">
 			<div class="inner">
 				<h2>Get in touch</h2>
@@ -238,6 +257,7 @@ window.onload = function () {
 
 </body>
 </html>
+
 
 
 
