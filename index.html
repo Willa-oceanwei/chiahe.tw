@@ -45,28 +45,29 @@
 
 		<!-- Initialize VANTA Halo -->
 		<script>
-			VANTA.HALO({
-				el: "#intro",
-				mouseControls: true,
-				touchControls: true,
-				gyroControls: false,
-				minHeight: 400.00,
-				minWidth: 400.00,
-				baseColor: 0xffd166,      // 黃色球
-				backgroundColor: 0x131a43 // 深藍背景
-				size: 1,                   // 光暈大小
-				amplitudeFactor: 1.5       // 光暈振幅加大，看起來更豐富
-				xOffset: 0.2,                  // 球水平位置 (0-1)
-				yOffset: 0.2,                  // 球垂直位置 (0-1)
-				autopilot: true,
-				speed: 1.0
-			});
+		VANTA.HALO({
+  		el: "#intro",
+  		mouseControls: true,
+  		touchControls: true,
+  		gyroControls: false,
+  		minHeight: 400.00,
+  		minWidth: 400.00,
+  		baseColor: 0xffd166,      // 黃色球
+  		backgroundColor: 0x131a43, // 深藍背景
+  		size: 1,                   // 光暈大小
+  		amplitudeFactor: 1.5,      // 光暈振幅加大
+  		xOffset: 0.2,              // 球水平位置 (0-1)
+  		yOffset: 0.2,              // 球垂直位置 (0-1)
+  		autopilot: true,
+  		speed: 1.0
+		});
 
-			// 避免初次載入 layout jump
-			window.onload = function () {
-				window.dispatchEvent(new Event("resize"));
-			};
-		</script>
+// 避免初次載入 layout jump
+window.onload = function () {
+  window.dispatchEvent(new Event("resize"));
+};
+</script>
+
 
 		<!-- One -->
 		<section id="one" class="wrapper style2 spotlights">
@@ -236,4 +237,5 @@
 
 </body>
 </html>
+
 
