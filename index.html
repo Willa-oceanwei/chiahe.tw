@@ -46,29 +46,33 @@
 		<!-- Initialize VANTA Halo -->
 		<script>
 		VANTA.HALO({
-			el: "#intro",
-			mouseControls: true,
-			touchControls: true,
-			gyroControls: false,
-			minHeight: 400.00,
-			minWidth: 400.00,
-			baseColor: 0x001a59,       // 主球偏黃
-			backgroundColor: 0x131a43, // 深藍底
-			size: 1,                  // 光暈大小
-			amplitudeFactor: 1.5,       // 光暈振幅
-			xOffset: 0.2,               // 水平位置略右
-			yOffset: 0.1,               // 垂直位置略上
-			autopilot: true,
-			// 🎯 偏左光暈：你只要加這兩行！
-    		lightDirectionX: -1.5, 
+    		el: "#intro",
+    		mouseControls: true,
+    		touchControls: true,
+    		gyroControls: false,
+    		minHeight: 400.00,
+    		minWidth: 400.00,
+    		baseColor: 0x001a59,        // 主球偏黃
+    		backgroundColor: 0x131a43,  // 深藍底
+    		size: 1,                    // 光暈大小
+    		amplitudeFactor: 2.2,       // 光暈能量（較官方逼近）
+    
+    		// ⭐ 讓球保持置中
+    		xOffset: 0,
+   		 	yOffset: 0.1,
+
+    		// ⭐ 讓光暈往左發散（最關鍵）
+    		lightDirectionX: -1.5,
     		lightDirectionY: 0.2,
-			speed: 1.0,
-			cohesion: 0.4               // 光暈層次更鬆散柔和
+
+    		autopilot: true,
+    		speed: 1.0,
+    		cohesion: 0.4
 		});
 
-		// 避免初次載入 layout jump
+		// 修正初次載入的位移跳動
 		window.onload = function () {
-			window.dispatchEvent(new Event("resize"));
+    		window.dispatchEvent(new Event("resize"));
 		};
 		</script>
 
@@ -108,6 +112,7 @@
 
 </body>
 </html>
+
 
 
 
