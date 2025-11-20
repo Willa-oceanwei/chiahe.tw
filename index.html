@@ -7,38 +7,11 @@
 	<link rel="stylesheet" href="assets/css/main.css" />
 	<noscript><link rel="stylesheet" href="assets/css/noscript.css" /></noscript>
 
-	<!-- 阻止 VANTA 造成水平偏移 -->
-	<style>
-	    body {
-	        overflow-x: hidden;
-	    }
-
-		html, body {
-    	padding: 0;
-    	margin: 0;
-    	width: 100%;
-    	overflow-x: hidden;   /* 強制水平滾動隱藏 */
-	}
-
-	#intro .vanta-canvas {   /* 如果你能找到生成的 canvas class 名稱 */
-    	position: absolute;
-    	top: 0;
-    	left: 50%;
-    	transform: translateX(-50%);
-    	width: 100vw !important;
-   	 height: 100vh !important;
-	}
-
-	</style>
-	
-
-	<!-- three.js + VANTA Halo -->
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/vanta/0.5.21/vanta.halo.min.js"></script>
 </head>
 <body class="is-preload">
 
-	<!-- Sidebar -->
 	<section id="sidebar">
 		<div class="inner">
 			<nav>
@@ -52,14 +25,12 @@
 		</div>
 	</section>
 
-	<!-- Wrapper -->
 	<div id="wrapper">
 
-		<!-- Intro -->
 		<section id="intro" class="wrapper style1 fullscreen fade-up">
 			<div class="inner">
 				<h1>Hyperspace</h1>
-				<p>Just another fine responsive site template designed by 
+				<p>Just another fine responsive site template designed by 
 				<a href="http://html5up.net">HTML5 UP</a><br />
 				and released for free under the <a href="http://html5up.net/license">Creative Commons</a>.</p>
 				<ul class="actions">
@@ -68,55 +39,51 @@
 			</div>
 		</section>
 
-		<!-- Initialize VANTA Halo -->
 		<script>
 		VANTA.HALO({
-    		el: "body",
-    		mouseControls: true,
-    		touchControls: true,
-    		gyroControls: false,
-    		minHeight: 400.00,
-    		minWidth: 400.00,
-    		baseColor: 0x001a59,        // 主球偏黃
-    		backgroundColor: 0x131a43,  // 深藍底
-    		size: 1,                    // 光暈大小
-    		amplitudeFactor: 2.2,       // 光暈能量（較官方逼近）
-    
-    		// ⭐ 讓球保持置中
-    		xOffset: -2.0,
-   		 	yOffset: 0.1,
+    		el: "#intro", // 修正：目標元素必須是 #intro，避免畫面佔滿整個 Body
+    		mouseControls: true,
+    		touchControls: true,
+    		gyroControls: false,
+    		minHeight: 400.00,
+    		minWidth: 400.00,
+    		
+    		// 顏色參數 (維持您最後設定的數值)
+    		baseColor: 0x001a59,        
+    		backgroundColor: 0x131a43,  
+    		size: 1,                    
+    		amplitudeFactor: 2.2,       
+   		 	cohesion: 0.4, // 維持您最後設定的暈開程度
 
-    		// ⭐ 讓光暈往左發散（最關鍵）
-    		lightDirectionX: -1.5,
-    		lightDirectionY: 0.2,
+    		// 修正：將球體置中 (0.5)，避免使用不合理的負值導致跑版
+    		xOffset: 0.5, // 設為 0.5 置中
+   		 	yOffset: 0.5, // 設為 0.5 置中
 
-    		autopilot: true,
-    		speed: 1.0,
-    		cohesion: 0.4
+    		// 移除不適用於 Halo 效果的 lightDirectionX/Y 參數
+    		// lightDirectionX: -1.5, 
+    		// lightDirectionY: 0.2,
+
+    		autopilot: true,
+    		speed: 1.0
 		});
 
 		// 修正初次載入的位移跳動
 		window.onload = function () {
-    		window.dispatchEvent(new Event("resize"));
+    		window.dispatchEvent(new Event("resize"));
 		};
 		</script>
 
-		<!-- 下面的 #one、#two、#three 等區塊保持不變 -->
 		<section id="one" class="wrapper style2 spotlights">
-			<!-- 你的內容保持不變 -->
-		</section>
+			</section>
 
 		<section id="two" class="wrapper style3 fade-up">
-			<!-- 你的內容保持不變 -->
-		</section>
+			</section>
 
 		<section id="three" class="wrapper style1 fade-up">
-			<!-- 你的內容保持不變 -->
-		</section>
+			</section>
 
 	</div>
 
-	<!-- Footer -->
 	<footer id="footer" class="wrapper style1-alt">
 		<div class="inner">
 			<ul class="menu">
@@ -126,7 +93,6 @@
 		</div>
 	</footer>
 
-	<!-- Scripts -->
 	<script src="assets/js/jquery.min.js"></script>
 	<script src="assets/js/jquery.scrollex.min.js"></script>
 	<script src="assets/js/jquery.scrolly.min.js"></script>
@@ -137,4 +103,3 @@
 
 </body>
 </html>
-
