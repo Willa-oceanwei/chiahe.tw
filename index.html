@@ -101,26 +101,64 @@
 		</section>
 
 		<!-- Section Three (Get in touch) -->
+		<!-- Section Three（Get in touch） -->
 		<section id="three" class="wrapper style1 fade-up">
-			<div class="inner">
+		<style>
+			.contact-info p {
+				margin-bottom: 0.5rem;
+				font-size: 1rem;
+			}
+		</style>
+
+		<div class="inner" style="display:flex; flex-wrap:wrap; gap:2rem;">
+
+			<!-- 左側表單 -->
+			<div style="flex:1; min-width:300px;">
 				<h2>Get in touch</h2>
-				<form id="contact-form" method="post" action="https://formspree.io/f/你的表單ID">
+
+				<form id="contact-form" 
+		      		method="post" 
+		      		action="https://formspree.io/f/你的表單ID">
+
 					<div class="fields">
+
 						<div class="field half first">
 							<input type="text" name="name" id="name" placeholder="Your Name" required />
 						</div>
+
 						<div class="field half">
 							<input type="email" name="email" id="email" placeholder="Your Email" required />
 						</div>
+
 						<div class="field">
 							<textarea name="message" id="message" rows="4" placeholder="Your Message" required></textarea>
 						</div>
+
 					</div>
+
 					<ul class="actions">
 						<li><input type="submit" value="Send Message" class="button special" /></li>
 					</ul>
+
 				</form>
 			</div>
+
+			<!-- 右側聯絡資訊 -->
+			<div style="flex:1; min-width:250px;" class="contact-info">
+				<h2>Contact Info</h2>
+
+				<p><strong>Address:</strong> 台北市永庸區中正南路309號</p>
+				<p><strong>Email:</strong> chaihe.tw@gmail.com</p>
+				<p><strong>Phone:</strong> 06-2536526</p>
+				<p><strong>Fax:</strong> 06-2537869</p>
+
+				<p><strong>LINE QR Code:</strong></p>
+				<img src="https://raw.githubusercontent.com/Willa-oceanwei/chiahe.tw/main/images/line_qrcode.png" 
+			 		alt="LINE QR Code" 
+			 		style="width:150px; height:auto; border-radius:8px;">
+			</div>
+
+		</div>
 		</section>
 
 	</div> <!-- End wrapper -->
@@ -156,3 +194,4 @@
 
 </body>
 </html>
+
