@@ -109,37 +109,11 @@
 
         		<div class="split style1">
 
-            		<!-- 左側：聯絡資訊 + QR code -->
-            		<section>
-                		<h3>聯絡資訊</h3>
-                		<ul class="contact">
-                    		<li>
-                        		<h4>公司地址</h4>
-                        		<span>（請填入你的公司地址）</span>
-                    		</li>
-
-                    		<li>
-                        		<h4>Email</h4>
-                        		<a href="mailto:chaihe.tw@gmail.com">chaihe.tw@gmail.com</a>
-                    		</li>
-
-                    		<li>
-                        		<h4>電話</h4>
-                        		<span>（請填入電話，例如 03-1234567）</span>
-                    		</li>
-
-                    		<li>
-                        		<h4>LINE 聯絡</h4>
-                        		<img src="images/line_qr.jpg" alt="LINE QR Code" 
-                             		style="width:160px; border-radius:8px; margin-top:10px;">
-                    		</li>
-                		</ul>
-            		</section>
-
-            		<!-- 右側：Formspree 聯絡表單 -->
+            		<!-- 左側：Formspree 表單 -->
             		<section>
                 		<form action="https://formspree.io/f/manvglbo" method="POST">
                     		<div class="fields">
+
                         		<div class="field half">
                             		<label for="name">姓名</label>
                             		<input type="text" name="name" id="name" required />
@@ -152,22 +126,49 @@
 
                         		<div class="field">
                             		<label for="message">訊息內容</label>
-                           		 <textarea name="message" id="message" rows="5" required></textarea>
+                            		<textarea name="message" id="message" rows="6" required></textarea>
                         		</div>
+
                     		</div>
 
                     		<ul class="actions">
-                        		<li>
-                            		<button type="submit" class="button submit">送出訊息</button>
-                        		</li>
+                        		<li><button type="submit" class="button submit">送出訊息</button></li>
                     		</ul>
                 		</form>
+            		</section>
+
+            		<!-- 右側：聯絡資訊 -->
+            		<section>
+                		<ul class="contact">
+
+                    		<li>
+                        		<h4>公司地址</h4>
+                        		<span>（請輸入公司地址）</span>
+                    		</li>
+
+                    		<li>
+                        		<h4>Email</h4>
+                        		<a href="mailto:chaihe.tw@gmail.com">chaihe.tw@gmail.com</a>
+                    		</li>
+
+                    		<li>
+                        		<h4>電話</h4>
+                        		<span>（請輸入電話，例如 03-1234567）</span>
+                    		</li>
+
+                    		<li>
+                        		<h4>LINE 聯絡</h4>
+                        		<img src="images/line_qr.jpg" 
+                             		alt="LINE QR Code" 
+                             		style="width:160px; border-radius:10px; margin-top:10px;">
+                    		</li>
+
+                		</ul>
             		</section>
 
         		</div>
     		</div>
 		</section>
-
 
 	</div> <!-- End wrapper -->
 
@@ -202,6 +203,7 @@
 
 </body>
 </html>
+
 
 
 
