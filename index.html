@@ -1,7 +1,7 @@
 <!DOCTYPE HTML>
 <html>
 <head>
-	<title>Hyperspace by HTML5 UP</title>
+	<title>佳咊實業有限公司｜顏料、色粉、添加劑專家</title>
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
 	<link rel="stylesheet" href="assets/css/main.css" />
@@ -101,65 +101,73 @@
 		</section>
 
 		<!-- Section Three (Get in touch) -->
-		<!-- Section Three（Get in touch） -->
+		<!-- Get in touch -->
 		<section id="three" class="wrapper style1 fade-up">
-		<style>
-			.contact-info p {
-				margin-bottom: 0.5rem;
-				font-size: 1rem;
-			}
-		</style>
+    		<div class="inner">
+        		<h2>Get in touch</h2>
+        		<p>如有任何需求，歡迎與我們聯絡，我們將盡速回覆您。</p>
 
-		<div class="inner" style="display:flex; flex-wrap:wrap; gap:2rem;">
+        		<div class="split style1">
 
-			<!-- 左側表單 -->
-			<div style="flex:1; min-width:300px;">
-				<h2>Get in touch</h2>
+            		<!-- 左側：聯絡資訊 + QR code -->
+            		<section>
+                		<h3>聯絡資訊</h3>
+                		<ul class="contact">
+                    		<li>
+                        		<h4>公司地址</h4>
+                        		<span>（請填入你的公司地址）</span>
+                    		</li>
 
-				<form id="contact-form" 
-		      		method="post" 
-		      		action="https://formspree.io/f/你的表單ID">
+                    		<li>
+                        		<h4>Email</h4>
+                        		<a href="mailto:chaihe.tw@gmail.com">chaihe.tw@gmail.com</a>
+                    		</li>
 
-					<div class="fields">
+                    		<li>
+                        		<h4>電話</h4>
+                        		<span>（請填入電話，例如 03-1234567）</span>
+                    		</li>
 
-						<div class="field half first">
-							<input type="text" name="name" id="name" placeholder="Your Name" required />
-						</div>
+                    		<li>
+                        		<h4>LINE 聯絡</h4>
+                        		<img src="images/line_qr.jpg" alt="LINE QR Code" 
+                             		style="width:160px; border-radius:8px; margin-top:10px;">
+                    		</li>
+                		</ul>
+            		</section>
 
-						<div class="field half">
-							<input type="email" name="email" id="email" placeholder="Your Email" required />
-						</div>
+            		<!-- 右側：Formspree 聯絡表單 -->
+            		<section>
+                		<form action="https://formspree.io/f/manvglbo" method="POST">
+                    		<div class="fields">
+                        		<div class="field half">
+                            		<label for="name">姓名</label>
+                            		<input type="text" name="name" id="name" required />
+                        		</div>
 
-						<div class="field">
-							<textarea name="message" id="message" rows="4" placeholder="Your Message" required></textarea>
-						</div>
+                        		<div class="field half">
+                            		<label for="email">Email</label>
+                            		<input type="email" name="email" id="email" required />
+                        		</div>
 
-					</div>
+                        		<div class="field">
+                            		<label for="message">訊息內容</label>
+                           		 <textarea name="message" id="message" rows="5" required></textarea>
+                        		</div>
+                    		</div>
 
-					<ul class="actions">
-						<li><input type="submit" value="Send Message" class="button special" /></li>
-					</ul>
+                    		<ul class="actions">
+                        		<li>
+                            		<button type="submit" class="button submit">送出訊息</button>
+                        		</li>
+                    		</ul>
+                		</form>
+            		</section>
 
-				</form>
-			</div>
-
-			<!-- 右側聯絡資訊 -->
-			<div style="flex:1; min-width:250px;" class="contact-info">
-				<h2>Contact Info</h2>
-
-				<p><strong>Address:</strong> 710台南市永庸區中正南路309號</p>
-				<p><strong>Email:</strong> chaihe.tw@gmail.com</p>
-				<p><strong>Phone:</strong> 06-2536526</p>
-				<p><strong>Fax:</strong> 06-2537869</p>
-
-				<p><strong>LINE QR Code:</strong></p>
-				<img src="https://raw.githubusercontent.com/Willa-oceanwei/chiahe.tw/main/images/line_qrcode.png" 
-			 		alt="LINE QR Code" 
-			 		style="width:150px; height:auto; border-radius:8px;">
-			</div>
-
-		</div>
+        		</div>
+    		</div>
 		</section>
+
 
 	</div> <!-- End wrapper -->
 
@@ -194,6 +202,7 @@
 
 </body>
 </html>
+
 
 
 
