@@ -35,7 +35,7 @@
 				<h1 style="font-size:38px;">佳咊實業有限公司</h1>
 				<p style="font-size:18px;">
   					以40年顏料及添加劑應用經驗，在日益嚴格的環境法規下協助客戶達成多元化需求。<br />
-  					讓你的顏色  獨一無二。
+  					讓你的顏色獨一無二。
 				</p>
 				<ul class="actions">
 					<li><a href="#one" class="button scrolly">Learn more</a></li>
@@ -65,7 +65,6 @@
     		cohesion: 0.4
 		});
 
-		// 修正初次載入位移跳動
 		window.onload = function () {
     		window.dispatchEvent(new Event("resize"));
 		};
@@ -74,14 +73,11 @@
 		<!-- Section One -->
 		<section id="one" class="wrapper style2 spotlights">
 			<div class="inner" style="display: flex; align-items: center; gap: 2rem;">
-				<!-- 左邊圖片 -->
 				<div class="spotlight-image" style="flex: 1;">
 					<img src="https://raw.githubusercontent.com/Willa-oceanwei/chiahe.tw/main/images/product.img.jpg" 
 						 alt="公司圖片" 
 						 style="width:100%; height:auto; border-radius:8px;">
 				</div>
-
-				<!-- 右邊文字 -->
 				<div class="spotlight-text" style="flex: 1;">
 					<h2>Who we are</h2>
 					<p>這裡放公司介紹內容。</p>
@@ -90,56 +86,73 @@
 		</section>
 
 		<!-- Section Two -->
-		<!-- Section Two -->
 		<section id="two" class="wrapper style3 fade-up">
 			<div class="inner" style="display:flex; align-items:center; gap:2rem;">
-
-				<!-- 左邊圖片 -->
 				<div class="spotlight-image" style="flex:1;">
 					<img src="https://raw.githubusercontent.com/Willa-oceanwei/chiahe.tw/main/images/work.img.jpg" 
 				 		alt="服務圖片"
-				 		style="width:100%; border-radius:8px;">
+				 		style="width:100%; height:auto; border-radius:8px;">
 				</div>
-
-				<!-- 右邊文字 -->
 				<div class="spotlight-text" style="flex:1;">
 					<h2>What we do</h2>
 					<p>這裡放服務內容或產品介紹。</p>
 				</div>
-
 			</div>
 		</section>
 
-		<!-- Section Three（Get in touch） -->
+		<!-- Section Three (Get in touch) -->
 		<section id="three" class="wrapper style1 fade-up">
 			<div class="inner">
-
 				<h2>Get in touch</h2>
-
 				<form id="contact-form" method="post" action="https://formspree.io/f/你的表單ID">
 					<div class="fields">
-
 						<div class="field half first">
 							<input type="text" name="name" id="name" placeholder="Your Name" required />
 						</div>
-
 						<div class="field half">
 							<input type="email" name="email" id="email" placeholder="Your Email" required />
 						</div>
-
 						<div class="field">
 							<textarea name="message" id="message" rows="4" placeholder="Your Message" required></textarea>
 						</div>
-
 					</div>
-
 					<ul class="actions">
 						<li><input type="submit" value="Send Message" class="button special" /></li>
 					</ul>
-
 				</form>
-
 			</div>
 		</section>
 
+	</div> <!-- End wrapper -->
 
+	<!-- Footer -->
+	<footer id="footer" class="wrapper style1-alt">
+		<div class="inner">
+			<ul class="menu">
+				<li>&copy; Untitled. All rights reserved.</li>
+				<li>Design: <a href="http://html5up.net">HTML5 UP</a></li>
+			</ul>
+		</div>
+	</footer>
+
+	<!-- Scripts -->
+	<script src="assets/js/jquery.min.js"></script>
+	<script src="assets/js/jquery.scrollex.min.js"></script>
+	<script src="assets/js/jquery.scrolly.min.js"></script>
+	<script src="assets/js/browser.min.js"></script>
+	<script src="assets/js/breakpoints.min.js"></script>
+	<script src="assets/js/util.js"></script>
+	<script src="assets/js/main.js"></script>
+
+	<!-- 初始化 scrolly 平滑滾動 -->
+	<script>
+	$(document).ready(function() {
+		$('.scrolly').scrolly({
+			speed: 1000,
+			offset: 0
+		});
+	});
+	</script>
+
+</body>
+</html>
