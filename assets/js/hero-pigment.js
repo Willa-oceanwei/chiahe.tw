@@ -1,48 +1,48 @@
-/* Living pigment field for the home-page hero. */
+/* GPU pigment field for the home-page hero. WebGL2 transform feedback keeps all
+ * per-particle integration on the GPU; the CPU only updates interaction fields. */
 (function () {
   'use strict';
 
-  const PARTICLE_CONFIG = {
-    desktopCount: 1200,
-    mobileCount: 500,
-    reducedMotionCount: 100,
+  const PIGMENT_CONFIG = {
+    desktopCount: 24000,
+    mobileCount: 9000,
+    reducedMotionCount: 2500,
     clusterCount: 5,
-    clusterRadiusMin: 160,
-    clusterRadiusMax: 260,
-    minSize: 0.32,
-    mediumSize: 0.82,
-    maxSize: 1.9,
-    clusterAttractionStrength: 0.000032,
-    separationDistance: 5.5,
-    separationStrength: 0.014,
-    damping: 0.978,
-    mouseInnerRadius: 105,
-    mouseOuterRadius: 270,
-    mouseForce: 0.052,
-    mouseVelocityForce: 0.018,
-    clusterAttractionRange: 620,
-    clusterCollisionDistance: 205,
-    collisionDistance: 22,
-    collisionImpulse: 2.7,
-    maxActiveCollisions: 2,
-    collisionIntervalMin: 300,
-    collisionIntervalMax: 510,
-    diffusionLife: 260,
-    maxActiveDiffusions: 8,
-    spatialCellSize: 12,
-    dprCap: 1.6
+    pointSizeMin: 0.72,
+    pointSizeMax: 2.35,
+    flowScale: 3.2,
+    flowStrength: 0.34,
+    clusterStrength: 0.18,
+    damping: 0.986,
+    mouseInnerRadius: 0.105,
+    mouseOuterRadius: 0.29,
+    mouseRadialForce: 1.35,
+    mouseSwirlForce: 0.72,
+    mouseWakeForce: 0.95,
+    collisionIntervalMin: 4.8,
+    collisionIntervalMax: 7.5,
+    approachDuration: 1.55,
+    compressionDuration: 0.72,
+    impactDuration: 0.48,
+    wakeDuration: 3.1,
+    collisionRadius: 0.22,
+    collisionImpulse: 2.15,
+    resonanceDuration: 2.15,
+    resonanceMaxRadius: 0.58,
+    desktopDprCap: 1.65,
+    mobileDprCap: 1.25
   };
 
-  const COLOR_PALETTE = [
-    [39, 177, 187],
-    [202, 76, 137],
-    [228, 184, 67],
-    [224, 112, 73],
-    [116, 92, 164]
+  const PALETTE = [
+    [0.153, 0.694, 0.733], // cyan pigment
+    [0.792, 0.298, 0.537], // magenta pigment
+    [0.894, 0.722, 0.263], // yellow pigment
+    [0.878, 0.439, 0.286], // orange pigment
+    [0.455, 0.361, 0.643]  // violet pigment
   ];
 
-  window.HERO_PIGMENT_CONFIG = PARTICLE_CONFIG;
-  window.HERO_PIGMENT_PALETTE = COLOR_PALETTE;
+  window.HERO_PIGMENT_CONFIG = PIGMENT_CONFIG;
+  window.HERO_PIGMENT_PALETTE = PALETTE;
 
   const hero = document.getElementById('intro');
   if (!hero) return;
@@ -51,468 +51,570 @@
   canvas.className = 'hero-pigment-canvas';
   canvas.setAttribute('aria-hidden', 'true');
   hero.insertBefore(canvas, hero.firstChild);
-  const ctx = canvas.getContext('2d', { alpha: false });
-  if (!ctx) return;
+
+  const gl = canvas.getContext('webgl2', {
+    alpha: false,
+    antialias: false,
+    depth: false,
+    powerPreference: 'high-performance',
+    preserveDrawingBuffer: false
+  });
+  if (!gl) {
+    canvas.remove();
+    hero.classList.add('hero-pigment-fallback');
+    return;
+  }
 
   const mobileQuery = window.matchMedia('(max-width: 736px)');
   const reducedQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-  const pointer = { x: 0, y: 0, oldX: 0, oldY: 0, vx: 0, vy: 0, active: false };
+  const pointer = {
+    x: 0, y: 0, previousX: 0, previousY: 0,
+    vx: 0, vy: 0, active: 0
+  };
+  const resonance = { x: 0, y: 0, age: 99 };
+  const fieldCollision = {
+    first: 0, second: 1, age: 99, next: 2.4, active: false
+  };
+
   let width = 1;
   let height = 1;
-  let particles = [];
-  let clusters = [];
-  let diffusions = [];
-  let burstParticles = [];
-  let collision = null;
-  let collisionClock = 150;
-  let gridHeads = new Int32Array(1);
-  let gridNext = new Int32Array(1);
-  let gridColumns = 1;
-  let gridRows = 1;
+  let aspect = 1;
+  let dpr = 1;
+  let particleCount = 0;
+  let sourceIndex = 0;
+  let particleSets = [];
+  let updateProgram;
+  let renderProgram;
+  let backgroundProgram;
+  let updateUniforms;
+  let renderUniforms;
+  let backgroundUniforms;
+  let emptyVao;
   let animationFrame = 0;
   let lastTime = performance.now();
+  let elapsed = 0;
   let visible = !document.hidden;
 
   const random = (min, max) => min + Math.random() * (max - min);
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
-  const rgba = (colour, alpha) => `rgba(${colour[0] | 0},${colour[1] | 0},${colour[2] | 0},${alpha})`;
 
-  function rgbToOklab(colour) {
-    const linear = colour.map((value) => {
-      value /= 255;
-      return value <= 0.04045 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
-    });
-    const l = Math.cbrt(0.4122214708 * linear[0] + 0.5363325363 * linear[1] + 0.0514459929 * linear[2]);
-    const m = Math.cbrt(0.2119034982 * linear[0] + 0.6806995451 * linear[1] + 0.1073969566 * linear[2]);
-    const s = Math.cbrt(0.0883024619 * linear[0] + 0.2817188376 * linear[1] + 0.6299787005 * linear[2]);
-    return [
-      0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
-      1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
-      0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s
-    ];
+  const UPDATE_VERTEX = `#version 300 es
+    precision highp float;
+    layout(location=0) in vec2 aPosition;
+    layout(location=1) in vec2 aVelocity;
+    layout(location=2) in float aSeed;
+    layout(location=3) in float aGroup;
+
+    uniform float uTime;
+    uniform float uDelta;
+    uniform float uAspect;
+    uniform float uFlowStrength;
+    uniform float uClusterStrength;
+    uniform float uDamping;
+    uniform vec2 uCenters[5];
+    uniform vec4 uMouse;
+    uniform vec2 uMouseVelocity;
+    uniform vec4 uCollision;
+    uniform vec2 uCollisionGroups;
+    uniform vec4 uWave;
+
+    out vec2 vPosition;
+    out vec2 vVelocity;
+
+    vec2 curlField(vec2 p, float seed) {
+      // Analytic derivatives of three travelling wave potentials form a
+      // divergence-light curl field without CPU noise sampling.
+      vec2 q = vec2(p.x * uAspect, p.y);
+      float t = uTime * 0.12;
+      float dX = 2.7*cos(dot(q,vec2(2.7,1.9))+t+seed*4.0)
+               - 2.1*sin(dot(q,vec2(-2.1,3.1))-t*0.73+seed);
+      float dY = 1.9*cos(dot(q,vec2(2.7,1.9))+t+seed*4.0)
+               + 3.1*sin(dot(q,vec2(-2.1,3.1))-t*0.73+seed);
+      dX += 1.35*cos(dot(q,vec2(1.35,-3.7))+t*0.51-seed*2.0);
+      dY -= 3.7*cos(dot(q,vec2(1.35,-3.7))+t*0.51-seed*2.0);
+      return vec2(dY, -dX) * 0.12;
+    }
+
+    void main() {
+      vec2 position = aPosition;
+      vec2 velocity = aVelocity;
+      int groupIndex = int(aGroup + 0.5);
+      vec2 center = uCenters[groupIndex];
+
+      // A bent ribbon target, rather than a circular point attractor, lets
+      // each colour field stretch, fork and fold continuously.
+      float strand = sin(position.y*7.0 + uTime*0.18 + aSeed*6.283);
+      vec2 tangent = normalize(vec2(
+        cos(uTime*0.09 + float(groupIndex)*1.4),
+        sin(uTime*0.11 + float(groupIndex)*1.7)
+      ));
+      vec2 ribbonTarget = center + tangent * strand * (0.14 + 0.055*sin(aSeed*19.0));
+      vec2 toRibbon = ribbonTarget - position;
+      float ribbonDistance = length(toRibbon);
+      velocity += toRibbon * uClusterStrength * (0.35 + smoothstep(0.05,0.7,ribbonDistance)) * uDelta;
+      velocity += curlField(position*3.2 + center, aSeed) * uFlowStrength * uDelta;
+
+      // Mouse is one continuous radial + tangential + dragged wake field.
+      if (uMouse.z > 0.5) {
+        vec2 mouseDelta = position - uMouse.xy;
+        mouseDelta.x *= uAspect;
+        float mouseDistance = length(mouseDelta);
+        float outer = smoothstep(uMouse.w, 0.0, mouseDistance);
+        float inner = smoothstep(uMouse.w*0.38, 0.0, mouseDistance);
+        vec2 direction = mouseDistance > 0.0001 ? mouseDelta/mouseDistance : vec2(1.0,0.0);
+        vec2 tangentForce = vec2(-direction.y,direction.x);
+        float speed = min(length(uMouseVelocity)*8.0,2.2);
+        velocity += direction * (outer*0.34 + inner*1.35) * uDelta;
+        velocity += tangentForce * outer * (0.42 + speed*0.45) * uDelta;
+        velocity += uMouseVelocity * outer * (0.95 + speed) * uDelta;
+      }
+
+      // Expanding click ring applies force only near the moving wave front.
+      if (uWave.z < uWave.w) {
+        vec2 waveDelta = position-uWave.xy;
+        waveDelta.x *= uAspect;
+        float waveDistance = length(waveDelta);
+        float waveProgress = uWave.z/uWave.w;
+        float waveRadius = waveProgress*0.58;
+        float ring = exp(-pow((waveDistance-waveRadius)/0.035,2.0));
+        vec2 waveDirection = waveDistance > 0.0001 ? waveDelta/waveDistance : vec2(1.0,0.0);
+        velocity += waveDirection*ring*(1.25-waveProgress*0.45)*uDelta;
+        velocity += vec2(-waveDirection.y,waveDirection.x)*ring*0.18*uDelta;
+      }
+
+      // The CPU selects two fields and a phase; this shader deforms every
+      // affected particle coherently: anticipation, compression, impact, wake.
+      bool selected = abs(aGroup-uCollisionGroups.x)<0.25 || abs(aGroup-uCollisionGroups.y)<0.25;
+      if (selected && uCollision.z > 0.0) {
+        vec2 contactDelta = position-uCollision.xy;
+        contactDelta.x *= uAspect;
+        float contactDistance = length(contactDelta);
+        vec2 normal = contactDistance > 0.0001 ? contactDelta/contactDistance : vec2(1.0,0.0);
+        vec2 tangentCollision = vec2(-normal.y,normal.x);
+        float influence = smoothstep(0.44,0.0,contactDistance);
+        float phase = uCollision.z;
+        if (phase < 1.0) {
+          velocity -= normal*influence*(0.4+phase*0.95)*uDelta;
+          velocity += tangentCollision*influence*phase*0.22*uDelta;
+        } else if (phase < 2.0) {
+          velocity -= normal*influence*1.42*uDelta;
+          velocity += tangentCollision*influence*sin(aSeed*31.0)*0.38*uDelta;
+        } else if (phase < 3.0) {
+          velocity += normal*influence*2.15*uDelta;
+          velocity += tangentCollision*influence*sin(aSeed*47.0)*1.15*uDelta;
+        } else {
+          float wake = (1.0-(phase-3.0))*influence;
+          velocity += tangentCollision*wake*(0.9+0.5*sin(aSeed*23.0))*uDelta;
+          velocity += curlField(position*5.0,aSeed+uTime)*wake*0.65*uDelta;
+        }
+      }
+
+      velocity *= pow(uDamping,uDelta*60.0);
+      velocity = clamp(velocity,vec2(-1.8),vec2(1.8));
+      position += velocity*uDelta;
+      if (position.x < -0.12) position.x = 1.12;
+      if (position.x > 1.12) position.x = -0.12;
+      if (position.y < -0.12) position.y = 1.12;
+      if (position.y > 1.12) position.y = -0.12;
+      vPosition = position;
+      vVelocity = velocity;
+    }`;
+
+  const PASSTHROUGH_FRAGMENT = `#version 300 es
+    precision mediump float;
+    void main() { }
+  `;
+
+  const RENDER_VERTEX = `#version 300 es
+    precision highp float;
+    layout(location=0) in vec2 aPosition;
+    layout(location=1) in vec2 aVelocity;
+    layout(location=2) in float aSeed;
+    layout(location=3) in float aGroup;
+    uniform float uAspect;
+    uniform float uDpr;
+    uniform float uPointMin;
+    uniform float uPointMax;
+    uniform vec3 uPalette[5];
+    uniform vec4 uCollision;
+    uniform vec2 uCollisionGroups;
+    out vec4 vColour;
+
+    void main() {
+      vec2 clip = vec2(aPosition.x*2.0-1.0,1.0-aPosition.y*2.0);
+      gl_Position = vec4(clip,0.0,1.0);
+      float depth = fract(aSeed*17.731);
+      gl_PointSize = mix(uPointMin,uPointMax,pow(depth,3.1))*uDpr;
+      int groupIndex = int(aGroup+0.5);
+      vec3 colour = uPalette[groupIndex];
+      float alpha = mix(0.16,0.57,depth);
+
+      // Multiple perceptual interpolation positions create a colour ribbon,
+      // rather than replacing both colliding fields with one flat mixed hue.
+      bool selected = abs(aGroup-uCollisionGroups.x)<0.25 || abs(aGroup-uCollisionGroups.y)<0.25;
+      if (selected && uCollision.z>0.85) {
+        vec2 delta = aPosition-uCollision.xy;
+        delta.x *= uAspect;
+        float distanceToContact = length(delta);
+        float ribbon = smoothstep(0.27,0.015,distanceToContact);
+        float gradientPosition = clamp(0.5+delta.x*2.4+sin(delta.y*22.0+aSeed*9.0)*0.12,0.0,1.0);
+        vec3 firstColour = uPalette[int(uCollisionGroups.x+0.5)];
+        vec3 secondColour = uPalette[int(uCollisionGroups.y+0.5)];
+        vec3 transition = mix(firstColour,secondColour,smoothstep(0.0,1.0,gradientPosition));
+        colour = mix(colour,transition,ribbon*min(1.0,(uCollision.z-0.85)*2.4));
+        alpha += ribbon*0.16;
+      }
+      vColour = vec4(colour,alpha);
+    }`;
+
+  const RENDER_FRAGMENT = `#version 300 es
+    precision mediump float;
+    in vec4 vColour;
+    out vec4 outColour;
+    void main() {
+      vec2 point = gl_PointCoord*2.0-1.0;
+      float radius = dot(point,point);
+      if (radius>1.0) discard;
+      float powderEdge = smoothstep(1.0,0.12,radius);
+      outColour = vec4(vColour.rgb,vColour.a*powderEdge);
+    }`;
+
+  const BACKGROUND_VERTEX = `#version 300 es
+    precision highp float;
+    out vec2 vUv;
+    void main() {
+      vec2 position = vec2((gl_VertexID<<1)&2,gl_VertexID&2);
+      vUv = position;
+      gl_Position = vec4(position*2.0-1.0,0.0,1.0);
+    }`;
+
+  const BACKGROUND_FRAGMENT = `#version 300 es
+    precision highp float;
+    in vec2 vUv;
+    uniform float uTime;
+    uniform float uAspect;
+    uniform vec2 uCenters[5];
+    uniform vec3 uPalette[5];
+    uniform vec4 uCollision;
+    uniform vec2 uCollisionGroups;
+    out vec4 outColour;
+
+    void main() {
+      vec2 uv = vUv;
+      vec3 colour = mix(vec3(0.067,0.102,0.239),vec3(0.145,0.098,0.26),uv.x*0.64+uv.y*0.2);
+      for (int index=0;index<5;index++) {
+        vec2 delta = uv-uCenters[index];
+        delta.x *= uAspect;
+        float angle = float(index)*1.37+uTime*0.025;
+        mat2 rotation = mat2(cos(angle),-sin(angle),sin(angle),cos(angle));
+        delta = rotation*delta;
+        float warped = length(delta*vec2(0.72,1.28))+sin(delta.x*13.0+uTime*0.1)*0.012;
+        float fog = smoothstep(0.44,0.015,warped)*0.19;
+        colour = mix(colour,uPalette[index],fog);
+      }
+      if (uCollision.z>0.9) {
+        vec2 delta = uv-uCollision.xy;
+        delta.x *= uAspect;
+        float wake = smoothstep(0.32,0.0,length(delta+vec2(sin(delta.y*18.0+uTime)*0.025,0.0)));
+        vec3 mixed = mix(uPalette[int(uCollisionGroups.x+0.5)],uPalette[int(uCollisionGroups.y+0.5)],0.5+0.18*sin(delta.y*28.0));
+        colour = mix(colour,mixed,wake*0.2*min(1.0,uCollision.z-0.75));
+      }
+      outColour = vec4(colour,1.0);
+    }`;
+
+  function compileShader(type, source) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      const message = gl.getShaderInfoLog(shader);
+      gl.deleteShader(shader);
+      throw new Error(`Hero pigment shader failed: ${message}`);
+    }
+    return shader;
   }
 
-  function oklabToRgb(lab) {
-    const l = Math.pow(lab[0] + 0.3963377774 * lab[1] + 0.2158037573 * lab[2], 3);
-    const m = Math.pow(lab[0] - 0.1055613458 * lab[1] - 0.0638541728 * lab[2], 3);
-    const s = Math.pow(lab[0] - 0.0894841775 * lab[1] - 1.291485548 * lab[2], 3);
-    return [
-      4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
-      -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
-      -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s
-    ].map((value) => {
-      value = value <= 0.0031308 ? 12.92 * value : 1.055 * Math.pow(Math.max(0, value), 1 / 2.4) - 0.055;
-      return 255 * clamp(value, 0, 1);
-    });
+  function createProgram(vertexSource, fragmentSource, varyings) {
+    const program = gl.createProgram();
+    gl.attachShader(program, compileShader(gl.VERTEX_SHADER, vertexSource));
+    gl.attachShader(program, compileShader(gl.FRAGMENT_SHADER, fragmentSource));
+    if (varyings) gl.transformFeedbackVaryings(program, varyings, gl.SEPARATE_ATTRIBS);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      const message = gl.getProgramInfoLog(program);
+      gl.deleteProgram(program);
+      throw new Error(`Hero pigment program failed: ${message}`);
+    }
+    return program;
   }
 
-  function mixColours(left, right) {
-    const a = rgbToOklab(left);
-    const b = rgbToOklab(right);
-    const balance = random(0.38, 0.62);
-    return oklabToRgb([
-      a[0] * balance + b[0] * (1 - balance) + random(-0.015, 0.022),
-      a[1] * balance + b[1] * (1 - balance) + random(-0.01, 0.01),
-      a[2] * balance + b[2] * (1 - balance) + random(-0.01, 0.01)
+  function locations(program, names) {
+    return names.reduce((result, name) => {
+      result[name] = gl.getUniformLocation(program, name);
+      return result;
+    }, {});
+  }
+
+  function setPalette(uniform) {
+    gl.uniform3fv(uniform, new Float32Array(PALETTE.flat()));
+  }
+
+  function initializePrograms() {
+    updateProgram = createProgram(UPDATE_VERTEX, PASSTHROUGH_FRAGMENT, ['vPosition', 'vVelocity']);
+    renderProgram = createProgram(RENDER_VERTEX, RENDER_FRAGMENT);
+    backgroundProgram = createProgram(BACKGROUND_VERTEX, BACKGROUND_FRAGMENT);
+    updateUniforms = locations(updateProgram, [
+      'uTime','uDelta','uAspect','uFlowStrength','uClusterStrength','uDamping',
+      'uCenters[0]','uMouse','uMouseVelocity','uCollision','uCollisionGroups','uWave'
     ]);
+    renderUniforms = locations(renderProgram, [
+      'uAspect','uDpr','uPointMin','uPointMax','uPalette[0]','uCollision','uCollisionGroups'
+    ]);
+    backgroundUniforms = locations(backgroundProgram, [
+      'uTime','uAspect','uCenters[0]','uPalette[0]','uCollision','uCollisionGroups'
+    ]);
+    emptyVao = gl.createVertexArray();
   }
 
-  function createClusters() {
-    clusters = Array.from({ length: PARTICLE_CONFIG.clusterCount }, (_, index) => {
-      const angle = index / PARTICLE_CONFIG.clusterCount * Math.PI * 2 - Math.PI / 2;
-      return {
-        x: width * 0.58 + Math.cos(angle) * width * 0.26,
-        y: height * 0.5 + Math.sin(angle) * height * 0.27,
-        vx: 0,
-        vy: 0,
-        radius: random(PARTICLE_CONFIG.clusterRadiusMin, PARTICLE_CONFIG.clusterRadiusMax),
-        phase: random(0, Math.PI * 2),
-        colour: COLOR_PALETTE[index]
-      };
+  function createBuffer(data, usage) {
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, data, usage);
+    return buffer;
+  }
+
+  function makeInitialState(count) {
+    const positions = new Float32Array(count * 2);
+    const velocities = new Float32Array(count * 2);
+    const seeds = new Float32Array(count);
+    const groups = new Float32Array(count);
+    for (let index=0;index<count;index+=1) {
+      const group = index % PIGMENT_CONFIG.clusterCount;
+      const band = Math.floor(index/PIGMENT_CONFIG.clusterCount) / Math.ceil(count/PIGMENT_CONFIG.clusterCount);
+      const angle = band*26.0 + group*1.7 + random(-0.28,0.28);
+      const ribbon = (band-0.5)*0.58;
+      const centerAngle = group/PIGMENT_CONFIG.clusterCount*Math.PI*2-Math.PI/2;
+      const centerX = 0.58+Math.cos(centerAngle)*0.265/aspect;
+      const centerY = 0.5+Math.sin(centerAngle)*0.27;
+      positions[index*2] = centerX + Math.cos(angle)*random(0.015,0.17)/aspect + Math.cos(centerAngle)*ribbon*0.14;
+      positions[index*2+1] = centerY + Math.sin(angle)*random(0.012,0.105) + Math.sin(centerAngle)*ribbon*0.11;
+      velocities[index*2] = random(-0.025,0.025);
+      velocities[index*2+1] = random(-0.025,0.025);
+      seeds[index] = Math.random();
+      groups[index] = group;
+    }
+    return { positions, velocities, seeds, groups };
+  }
+
+  function createParticleSet(positionData, velocityData, seedBuffer, groupBuffer) {
+    const position = createBuffer(positionData, gl.DYNAMIC_COPY);
+    const velocity = createBuffer(velocityData, gl.DYNAMIC_COPY);
+    const vao = gl.createVertexArray();
+    gl.bindVertexArray(vao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, position);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, velocity);
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1,2,gl.FLOAT,false,0,0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, seedBuffer);
+    gl.enableVertexAttribArray(2);
+    gl.vertexAttribPointer(2,1,gl.FLOAT,false,0,0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, groupBuffer);
+    gl.enableVertexAttribArray(3);
+    gl.vertexAttribPointer(3,1,gl.FLOAT,false,0,0);
+    return { position, velocity, vao };
+  }
+
+  function destroyParticleSets() {
+    if (particleSets[0]) {
+      gl.deleteBuffer(particleSets[0].seed);
+      gl.deleteBuffer(particleSets[0].group);
+    }
+    particleSets.forEach((set) => {
+      gl.deleteBuffer(set.position);
+      gl.deleteBuffer(set.velocity);
+      gl.deleteVertexArray(set.vao);
     });
+    particleSets = [];
   }
 
-  function particleSize() {
-    const roll = Math.random();
-    if (roll < 0.76) return random(PARTICLE_CONFIG.minSize, PARTICLE_CONFIG.mediumSize);
-    if (roll < 0.97) return random(PARTICLE_CONFIG.mediumSize, 1.25);
-    return random(1.25, PARTICLE_CONFIG.maxSize);
-  }
-
-  function createParticle(index) {
-    const clusterIndex = index % clusters.length;
-    const cluster = clusters[clusterIndex];
-    const angle = random(0, Math.PI * 2);
-    const normalizedRadius = Math.pow(Math.random(), 0.72);
-    const radius = cluster.radius * normalizedRadius;
-    const depth = Math.random();
-    return {
-      x: cluster.x + Math.cos(angle) * radius,
-      y: cluster.y + Math.sin(angle) * radius * 0.62,
-      vx: random(-0.16, 0.16),
-      vy: random(-0.16, 0.16),
-      size: particleSize() * (0.72 + depth * 0.48),
-      alpha: random(0.16, 0.42) + depth * 0.2,
-      speed: 0.72 + depth * 0.48,
-      cluster: clusterIndex,
-      colour: cluster.colour,
-      mixLife: 0,
-      phase: random(0, Math.PI * 2)
-    };
+  function initializeParticles() {
+    destroyParticleSets();
+    particleCount = reducedQuery.matches
+      ? PIGMENT_CONFIG.reducedMotionCount
+      : (mobileQuery.matches ? PIGMENT_CONFIG.mobileCount : PIGMENT_CONFIG.desktopCount);
+    const state = makeInitialState(particleCount);
+    const seedBuffer = createBuffer(state.seeds, gl.STATIC_DRAW);
+    const groupBuffer = createBuffer(state.groups, gl.STATIC_DRAW);
+    particleSets = [
+      createParticleSet(state.positions,state.velocities,seedBuffer,groupBuffer),
+      createParticleSet(state.positions,state.velocities,seedBuffer,groupBuffer)
+    ];
+    // VAOs retain these buffers; mark ownership on the first set for cleanup.
+    particleSets[0].seed = seedBuffer;
+    particleSets[0].group = groupBuffer;
+    sourceIndex = 0;
   }
 
   function resize() {
     const rect = hero.getBoundingClientRect();
-    const dpr = Math.min(window.devicePixelRatio || 1, PARTICLE_CONFIG.dprCap);
-    width = Math.max(1, rect.width);
-    height = Math.max(1, rect.height);
-    canvas.width = Math.round(width * dpr);
-    canvas.height = Math.round(height * dpr);
+    width = Math.max(1,rect.width);
+    height = Math.max(1,rect.height);
+    aspect = width/height;
+    dpr = Math.min(window.devicePixelRatio||1,mobileQuery.matches ? PIGMENT_CONFIG.mobileDprCap : PIGMENT_CONFIG.desktopDprCap);
+    canvas.width = Math.round(width*dpr);
+    canvas.height = Math.round(height*dpr);
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    createClusters();
-    const count = reducedQuery.matches
-      ? PARTICLE_CONFIG.reducedMotionCount
-      : (mobileQuery.matches ? PARTICLE_CONFIG.mobileCount : PARTICLE_CONFIG.desktopCount);
-    particles = Array.from({ length: count }, (_, index) => createParticle(index));
-    gridColumns = Math.ceil(width / PARTICLE_CONFIG.spatialCellSize);
-    gridRows = Math.ceil(height / PARTICLE_CONFIG.spatialCellSize);
-    gridHeads = new Int32Array(gridColumns * gridRows);
-    gridNext = new Int32Array(count);
-    diffusions = [];
-    burstParticles = [];
-    collision = null;
-    collisionClock = 150;
+    gl.viewport(0,0,canvas.width,canvas.height);
+    initializeParticles();
   }
 
-  function startClusterCollision() {
-    let a = Math.floor(Math.random() * clusters.length);
-    let b = (a + 1 + Math.floor(Math.random() * (clusters.length - 1))) % clusters.length;
-    const first = clusters[a];
-    const second = clusters[b];
-    const dx = second.x - first.x;
-    const dy = second.y - first.y;
-    const distance = Math.hypot(dx, dy) || 1;
-    if (distance > PARTICLE_CONFIG.clusterAttractionRange) b = (a + 1) % clusters.length;
-    collision = { a, b, age: 0, phase: 'approach', mixed: false };
-  }
-
-  function emitCollision(contactX, contactY, first, second) {
-    const mixed = mixColours(first.colour, second.colour);
-    diffusions.push({
-      x: contactX,
-      y: contactY,
-      colour: mixed,
-      age: 0,
-      life: PARTICLE_CONFIG.diffusionLife,
-      radius: random(58, 82),
-      phase: random(0, Math.PI * 2)
-    });
-    if (diffusions.length > PARTICLE_CONFIG.maxActiveDiffusions) diffusions.shift();
-
-    let recoloured = 0;
-    for (let index = 0; index < particles.length && recoloured < 90; index += 1) {
-      const particle = particles[index];
-      if (particle.cluster !== collision.a && particle.cluster !== collision.b) continue;
-      const dx = particle.x - contactX;
-      const dy = particle.y - contactY;
-      const distance = Math.hypot(dx, dy);
-      if (distance < 115 && Math.random() < 0.7) {
-        const direction = distance || 1;
-        particle.colour = mixColours(mixed, Math.random() < 0.5 ? first.colour : second.colour);
-        particle.mixLife = random(240, 430);
-        particle.vx += dx / direction * random(0.35, PARTICLE_CONFIG.collisionImpulse);
-        particle.vy += dy / direction * random(0.35, PARTICLE_CONFIG.collisionImpulse);
-        recoloured += 1;
-      }
+  function clusterCenters(time) {
+    const data = new Float32Array(10);
+    for (let index=0;index<5;index+=1) {
+      const angle = index/5*Math.PI*2-Math.PI/2;
+      const pulse = 1+Math.sin(time*0.13+index*1.71)*0.13;
+      data[index*2] = 0.58+Math.cos(angle)*0.265*pulse/aspect+Math.sin(time*0.08+index)*0.025;
+      data[index*2+1] = 0.5+Math.sin(angle)*0.27*pulse+Math.cos(time*0.065+index*1.4)*0.032;
     }
+    return data;
+  }
 
-    const burstCount = mobileQuery.matches ? 34 : 72;
-    for (let index = 0; index < burstCount; index += 1) {
-      const angle = random(0, Math.PI * 2);
-      const force = random(0.45, PARTICLE_CONFIG.collisionImpulse);
-      burstParticles.push({
-        x: contactX + random(-12, 12),
-        y: contactY + random(-12, 12),
-        vx: Math.cos(angle) * force,
-        vy: Math.sin(angle) * force,
-        size: particleSize(),
-        alpha: random(0.25, 0.62),
-        colour: mixColours(mixed, Math.random() < 0.5 ? first.colour : second.colour),
-        age: 0,
-        life: random(48, 82)
-      });
+  function updateCollision(delta) {
+    fieldCollision.next -= delta;
+    if (!fieldCollision.active && fieldCollision.next<=0 && !reducedQuery.matches) {
+      fieldCollision.first = Math.floor(Math.random()*5);
+      fieldCollision.second = (fieldCollision.first+1+Math.floor(Math.random()*4))%5;
+      fieldCollision.age = 0;
+      fieldCollision.active = true;
     }
+    if (!fieldCollision.active) return 0;
+    fieldCollision.age += delta;
+    const approach = PIGMENT_CONFIG.approachDuration;
+    const compression = approach+PIGMENT_CONFIG.compressionDuration;
+    const impact = compression+PIGMENT_CONFIG.impactDuration;
+    const total = impact+PIGMENT_CONFIG.wakeDuration;
+    if (fieldCollision.age<approach) return fieldCollision.age/approach;
+    if (fieldCollision.age<compression) return 1+(fieldCollision.age-approach)/PIGMENT_CONFIG.compressionDuration;
+    if (fieldCollision.age<impact) return 2+(fieldCollision.age-compression)/PIGMENT_CONFIG.impactDuration;
+    if (fieldCollision.age<total) return 3+(fieldCollision.age-impact)/PIGMENT_CONFIG.wakeDuration;
+    fieldCollision.active = false;
+    fieldCollision.next = random(PIGMENT_CONFIG.collisionIntervalMin,PIGMENT_CONFIG.collisionIntervalMax);
+    return 0;
   }
 
-  function updateClusterCollision(dt) {
-    collisionClock -= dt;
-    if (!collision && collisionClock <= 0 && !reducedQuery.matches) startClusterCollision();
-    if (!collision) return;
-
-    collision.age += dt;
-    const first = clusters[collision.a];
-    const second = clusters[collision.b];
-    const dx = second.x - first.x;
-    const dy = second.y - first.y;
-    const distance = Math.hypot(dx, dy) || 1;
-    const nx = dx / distance;
-    const ny = dy / distance;
-
-    if (collision.phase === 'approach') {
-      const pull = distance > PARTICLE_CONFIG.clusterCollisionDistance ? 0.026 : 0.012;
-      first.vx += nx * pull * dt;
-      first.vy += ny * pull * dt;
-      second.vx -= nx * pull * dt;
-      second.vy -= ny * pull * dt;
-      if (distance < PARTICLE_CONFIG.clusterCollisionDistance || collision.age > 155) {
-        collision.phase = 'compress';
-        collision.age = 0;
-      }
-    } else if (collision.phase === 'compress') {
-      first.vx += nx * 0.018 * dt;
-      first.vy += ny * 0.018 * dt;
-      second.vx -= nx * 0.018 * dt;
-      second.vy -= ny * 0.018 * dt;
-      if (collision.age > 42 && !collision.mixed) {
-        collision.mixed = true;
-        emitCollision((first.x + second.x) / 2, (first.y + second.y) / 2, first, second);
-        first.vx -= nx * PARTICLE_CONFIG.collisionImpulse;
-        first.vy -= ny * PARTICLE_CONFIG.collisionImpulse;
-        second.vx += nx * PARTICLE_CONFIG.collisionImpulse;
-        second.vy += ny * PARTICLE_CONFIG.collisionImpulse;
-        collision.phase = 'separate';
-        collision.age = 0;
-      }
-    } else if (collision.age > 95) {
-      collision = null;
-      collisionClock = random(PARTICLE_CONFIG.collisionIntervalMin, PARTICLE_CONFIG.collisionIntervalMax);
-    }
+  function collisionPoint(centers) {
+    const a = fieldCollision.first*2;
+    const b = fieldCollision.second*2;
+    return [(centers[a]+centers[b])*0.5,(centers[a+1]+centers[b+1])*0.5];
   }
 
-  function updateClusters(dt, time) {
-    updateClusterCollision(dt);
-    clusters.forEach((cluster, index) => {
-      cluster.vx += Math.sin(time * 0.00017 + cluster.phase + index) * 0.0015 * dt;
-      cluster.vy += Math.cos(time * 0.00014 + cluster.phase) * 0.0012 * dt;
-      if (cluster.x < width * 0.08) cluster.vx += 0.012 * dt;
-      if (cluster.x > width * 0.94) cluster.vx -= 0.012 * dt;
-      if (cluster.y < height * 0.09) cluster.vy += 0.012 * dt;
-      if (cluster.y > height * 0.91) cluster.vy -= 0.012 * dt;
-      cluster.vx *= Math.pow(0.992, dt);
-      cluster.vy *= Math.pow(0.992, dt);
-      cluster.x += cluster.vx * dt;
-      cluster.y += cluster.vy * dt;
-    });
+  function setInteractionUniforms(uniforms, centers, collisionPhase) {
+    const contact = collisionPoint(centers);
+    gl.uniform1f(uniforms.uAspect,aspect);
+    if (uniforms['uCenters[0]']) gl.uniform2fv(uniforms['uCenters[0]'],centers);
+    if (uniforms.uCollision) gl.uniform4f(uniforms.uCollision,contact[0],contact[1],collisionPhase,PIGMENT_CONFIG.collisionRadius);
+    if (uniforms.uCollisionGroups) gl.uniform2f(uniforms.uCollisionGroups,fieldCollision.first,fieldCollision.second);
   }
 
-  function rebuildSpatialGrid() {
-    gridHeads.fill(-1);
-    particles.forEach((particle, index) => {
-      const column = clamp(Math.floor(particle.x / PARTICLE_CONFIG.spatialCellSize), 0, gridColumns - 1);
-      const row = clamp(Math.floor(particle.y / PARTICLE_CONFIG.spatialCellSize), 0, gridRows - 1);
-      const cell = row * gridColumns + column;
-      gridNext[index] = gridHeads[cell];
-      gridHeads[cell] = index;
-    });
+  function updateParticles(delta, centers, collisionPhase) {
+    const source = particleSets[sourceIndex];
+    const target = particleSets[1-sourceIndex];
+    gl.useProgram(updateProgram);
+    gl.bindVertexArray(source.vao);
+    gl.uniform1f(updateUniforms.uTime,elapsed);
+    gl.uniform1f(updateUniforms.uDelta,delta);
+    gl.uniform1f(updateUniforms.uFlowStrength,reducedQuery.matches ? 0.055 : (mobileQuery.matches ? 0.25 : PIGMENT_CONFIG.flowStrength));
+    gl.uniform1f(updateUniforms.uClusterStrength,PIGMENT_CONFIG.clusterStrength);
+    gl.uniform1f(updateUniforms.uDamping,PIGMENT_CONFIG.damping);
+    gl.uniform4f(updateUniforms.uMouse,pointer.x,pointer.y,pointer.active,PIGMENT_CONFIG.mouseOuterRadius);
+    gl.uniform2f(updateUniforms.uMouseVelocity,pointer.vx,pointer.vy);
+    gl.uniform4f(updateUniforms.uWave,resonance.x,resonance.y,resonance.age,PIGMENT_CONFIG.resonanceDuration);
+    setInteractionUniforms(updateUniforms,centers,collisionPhase);
+    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,0,target.position);
+    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,1,target.velocity);
+    gl.enable(gl.RASTERIZER_DISCARD);
+    gl.beginTransformFeedback(gl.POINTS);
+    gl.drawArrays(gl.POINTS,0,particleCount);
+    gl.endTransformFeedback();
+    gl.disable(gl.RASTERIZER_DISCARD);
+    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,0,null);
+    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,1,null);
+    sourceIndex = 1-sourceIndex;
   }
 
-  function separateParticle(particle, index, dt) {
-    const column = clamp(Math.floor(particle.x / PARTICLE_CONFIG.spatialCellSize), 0, gridColumns - 1);
-    const row = clamp(Math.floor(particle.y / PARTICLE_CONFIG.spatialCellSize), 0, gridRows - 1);
-    let checked = 0;
-    for (let y = Math.max(0, row - 1); y <= Math.min(gridRows - 1, row + 1) && checked < 7; y += 1) {
-      for (let x = Math.max(0, column - 1); x <= Math.min(gridColumns - 1, column + 1) && checked < 7; x += 1) {
-        let neighbourIndex = gridHeads[y * gridColumns + x];
-        while (neighbourIndex !== -1 && checked < 7) {
-          if (neighbourIndex !== index) {
-            const neighbour = particles[neighbourIndex];
-            const dx = particle.x - neighbour.x;
-            const dy = particle.y - neighbour.y;
-            const squared = dx * dx + dy * dy;
-            if (squared > 0 && squared < PARTICLE_CONFIG.separationDistance * PARTICLE_CONFIG.separationDistance) {
-              const distance = Math.sqrt(squared);
-              const force = (1 - distance / PARTICLE_CONFIG.separationDistance) * PARTICLE_CONFIG.separationStrength * dt;
-              particle.vx += dx / distance * force;
-              particle.vy += dy / distance * force;
-            }
-            checked += 1;
-          }
-          neighbourIndex = gridNext[neighbourIndex];
-        }
-      }
-    }
+  function drawBackground(centers, collisionPhase) {
+    gl.disable(gl.BLEND);
+    gl.useProgram(backgroundProgram);
+    gl.bindVertexArray(emptyVao);
+    gl.uniform1f(backgroundUniforms.uTime,elapsed);
+    setPalette(backgroundUniforms['uPalette[0]']);
+    setInteractionUniforms(backgroundUniforms,centers,collisionPhase);
+    gl.drawArrays(gl.TRIANGLES,0,3);
   }
 
-  function applyPointerForce(particle, dt) {
-    if (!pointer.active || mobileQuery.matches || reducedQuery.matches) return;
-    const dx = particle.x - pointer.x;
-    const dy = particle.y - pointer.y;
-    const distance = Math.hypot(dx, dy) || 1;
-    if (distance >= PARTICLE_CONFIG.mouseOuterRadius) return;
-    const outer = 1 - distance / PARTICLE_CONFIG.mouseOuterRadius;
-    const inner = distance < PARTICLE_CONFIG.mouseInnerRadius
-      ? 1 - distance / PARTICLE_CONFIG.mouseInnerRadius
-      : 0;
-    const force = (outer * 0.012 + inner * PARTICLE_CONFIG.mouseForce) * dt;
-    const velocityScale = Math.min(2.4, Math.hypot(pointer.vx, pointer.vy) / 18);
-    particle.vx += dx / distance * force + pointer.vx * PARTICLE_CONFIG.mouseVelocityForce * outer * velocityScale;
-    particle.vy += dy / distance * force + pointer.vy * PARTICLE_CONFIG.mouseVelocityForce * outer * velocityScale;
-  }
-
-  function updateParticles(dt, time) {
-    rebuildSpatialGrid();
-    particles.forEach((particle, index) => {
-      const cluster = clusters[particle.cluster];
-      const dx = cluster.x - particle.x;
-      const dy = cluster.y - particle.y;
-      const distance = Math.hypot(dx, dy) || 1;
-      let attraction = PARTICLE_CONFIG.clusterAttractionStrength;
-      if (collision && (particle.cluster === collision.a || particle.cluster === collision.b) && collision.phase === 'compress') attraction *= 2.4;
-      particle.vx += dx * attraction * dt;
-      particle.vy += dy * attraction * dt;
-      particle.vx += Math.sin(time * 0.00055 + particle.phase + particle.y * 0.008) * 0.0022 * dt;
-      particle.vy += Math.cos(time * 0.00047 + particle.phase + particle.x * 0.008) * 0.002 * dt;
-      separateParticle(particle, index, dt);
-      applyPointerForce(particle, dt);
-      particle.vx *= Math.pow(PARTICLE_CONFIG.damping, dt);
-      particle.vy *= Math.pow(PARTICLE_CONFIG.damping, dt);
-      particle.x += particle.vx * particle.speed * dt;
-      particle.y += particle.vy * particle.speed * dt;
-      if (distance > cluster.radius * 1.65) {
-        particle.vx += dx / distance * 0.006 * dt;
-        particle.vy += dy / distance * 0.006 * dt;
-      }
-      if (particle.mixLife > 0) {
-        particle.mixLife -= dt;
-        if (particle.mixLife <= 0) particle.colour = cluster.colour;
-      }
-    });
-  }
-
-  function addResonance(x, y) {
-    let nearbyColours = [];
-    particles.forEach((particle) => {
-      const dx = particle.x - x;
-      const dy = particle.y - y;
-      const distance = Math.hypot(dx, dy) || 1;
-      if (distance < 190) {
-        const force = (1 - distance / 190) * 1.45;
-        particle.vx += dx / distance * force;
-        particle.vy += dy / distance * force;
-        if (!nearbyColours.includes(particle.cluster)) nearbyColours.push(particle.cluster);
-      }
-    });
-    if (nearbyColours.length > 1) {
-      const colour = mixColours(clusters[nearbyColours[0]].colour, clusters[nearbyColours[1]].colour);
-      diffusions.push({ x, y, colour, age: 0, life: 150, radius: 46, phase: random(0, Math.PI * 2) });
-      collisionClock = Math.min(collisionClock, 75);
-    }
-  }
-
-  function updateEffects(dt) {
-    diffusions.forEach((cloud) => { cloud.age += dt; });
-    diffusions = diffusions.filter((cloud) => cloud.age < cloud.life);
-    burstParticles.forEach((particle) => {
-      particle.x += particle.vx * dt;
-      particle.y += particle.vy * dt;
-      particle.vx *= Math.pow(0.95, dt);
-      particle.vy *= Math.pow(0.95, dt);
-      particle.age += dt;
-    });
-    burstParticles = burstParticles.filter((particle) => particle.age < particle.life);
-  }
-
-  function drawCloud(cloud, time) {
-    const progress = cloud.age / cloud.life;
-    const opacity = Math.sin(progress * Math.PI) * 0.24;
-    for (let layer = 0; layer < 5; layer += 1) {
-      const wobble = cloud.phase + layer * 1.37 + time * 0.00016;
-      const x = cloud.x + Math.sin(wobble) * cloud.radius * 0.3;
-      const y = cloud.y + Math.cos(wobble * 1.21) * cloud.radius * 0.22;
-      const radius = cloud.radius * (0.65 + progress * 2.8 + layer * 0.14);
-      const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
-      gradient.addColorStop(0, rgba(cloud.colour, opacity));
-      gradient.addColorStop(0.45, rgba(cloud.colour, opacity * 0.48));
-      gradient.addColorStop(1, rgba(cloud.colour, 0));
-      ctx.fillStyle = gradient;
-      ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
-    }
-  }
-
-  function draw(time) {
-    const background = ctx.createLinearGradient(0, 0, width, height);
-    background.addColorStop(0, '#111a3d');
-    background.addColorStop(0.52, '#182654');
-    background.addColorStop(1, '#251942');
-    ctx.fillStyle = background;
-    ctx.fillRect(0, 0, width, height);
-
-    clusters.forEach((cluster) => {
-      const radius = cluster.radius * 1.42;
-      const gradient = ctx.createRadialGradient(cluster.x, cluster.y, 0, cluster.x, cluster.y, radius);
-      gradient.addColorStop(0, rgba(cluster.colour, 0.24));
-      gradient.addColorStop(0.42, rgba(cluster.colour, 0.12));
-      gradient.addColorStop(1, rgba(cluster.colour, 0));
-      ctx.fillStyle = gradient;
-      ctx.fillRect(cluster.x - radius, cluster.y - radius, radius * 2, radius * 2);
-    });
-    diffusions.forEach((cloud) => drawCloud(cloud, time));
-
-    particles.forEach((particle) => {
-      ctx.beginPath();
-      ctx.fillStyle = rgba(particle.colour, particle.alpha);
-      ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
-      ctx.fill();
-    });
-    burstParticles.forEach((particle) => {
-      ctx.beginPath();
-      ctx.fillStyle = rgba(particle.colour, particle.alpha * (1 - particle.age / particle.life));
-      ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
-      ctx.fill();
-    });
+  function drawParticles(centers, collisionPhase) {
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+    gl.useProgram(renderProgram);
+    gl.bindVertexArray(particleSets[sourceIndex].vao);
+    gl.uniform1f(renderUniforms.uDpr,dpr);
+    gl.uniform1f(renderUniforms.uPointMin,PIGMENT_CONFIG.pointSizeMin);
+    gl.uniform1f(renderUniforms.uPointMax,PIGMENT_CONFIG.pointSizeMax);
+    setPalette(renderUniforms['uPalette[0]']);
+    setInteractionUniforms(renderUniforms,centers,collisionPhase);
+    gl.drawArrays(gl.POINTS,0,particleCount);
   }
 
   function animate(time) {
     if (!visible) return;
-    const dt = Math.min(1.8, (time - lastTime) / 16.667 || 1);
+    const rawDelta = Math.min(0.033,(time-lastTime)/1000||0.0167);
+    const delta = reducedQuery.matches ? rawDelta*0.16 : rawDelta;
     lastTime = time;
-    const pace = reducedQuery.matches ? 0.2 : 1;
-    updateClusters(dt * pace, time);
-    updateParticles(dt * pace, time);
-    updateEffects(dt * pace);
-    draw(time);
-    pointer.vx *= 0.72;
-    pointer.vy *= 0.72;
+    elapsed += delta;
+    resonance.age += rawDelta;
+    const collisionPhase = updateCollision(rawDelta);
+    const centers = clusterCenters(elapsed);
+    updateParticles(delta,centers,collisionPhase);
+    drawBackground(centers,collisionPhase);
+    drawParticles(centers,collisionPhase);
+    pointer.vx *= 0.82;
+    pointer.vy *= 0.82;
     animationFrame = requestAnimationFrame(animate);
   }
 
-  hero.addEventListener('pointermove', (event) => {
-    if (event.pointerType === 'touch') return;
+  function pointerPosition(event) {
     const rect = hero.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-    pointer.vx = clamp(x - pointer.oldX, -45, 45);
-    pointer.vy = clamp(y - pointer.oldY, -45, 45);
-    pointer.x = x;
-    pointer.y = y;
-    pointer.oldX = x;
-    pointer.oldY = y;
-    pointer.active = true;
-  }, { passive: true });
-  hero.addEventListener('pointerenter', (event) => {
-    const rect = hero.getBoundingClientRect();
-    pointer.oldX = event.clientX - rect.left;
-    pointer.oldY = event.clientY - rect.top;
-  }, { passive: true });
-  hero.addEventListener('pointerleave', () => { pointer.active = false; }, { passive: true });
-  hero.addEventListener('pointerdown', (event) => {
+    return [(event.clientX-rect.left)/rect.width,(event.clientY-rect.top)/rect.height];
+  }
+
+  hero.addEventListener('pointerenter',(event) => {
+    if (event.pointerType==='touch') return;
+    const position = pointerPosition(event);
+    pointer.x = pointer.previousX = position[0];
+    pointer.y = pointer.previousY = position[1];
+    pointer.active = 1;
+  },{passive:true});
+  hero.addEventListener('pointermove',(event) => {
+    if (event.pointerType==='touch') return;
+    const position = pointerPosition(event);
+    pointer.vx = clamp(position[0]-pointer.previousX,-0.08,0.08);
+    pointer.vy = clamp(position[1]-pointer.previousY,-0.08,0.08);
+    pointer.x = pointer.previousX = position[0];
+    pointer.y = pointer.previousY = position[1];
+    pointer.active = 1;
+  },{passive:true});
+  hero.addEventListener('pointerleave',() => { pointer.active = 0; },{passive:true});
+  hero.addEventListener('pointerdown',(event) => {
     if (reducedQuery.matches) return;
-    const rect = hero.getBoundingClientRect();
-    addResonance(event.clientX - rect.left, event.clientY - rect.top);
-  }, { passive: true });
-  document.addEventListener('visibilitychange', () => {
+    const position = pointerPosition(event);
+    resonance.x = position[0];
+    resonance.y = position[1];
+    resonance.age = 0;
+  },{passive:true});
+  document.addEventListener('visibilitychange',() => {
     visible = !document.hidden;
     cancelAnimationFrame(animationFrame);
     if (visible) {
@@ -520,12 +622,19 @@
       animationFrame = requestAnimationFrame(animate);
     }
   });
-  window.addEventListener('resize', resize, { passive: true });
+  window.addEventListener('resize',resize,{passive:true});
   if (mobileQuery.addEventListener) {
-    mobileQuery.addEventListener('change', resize);
-    reducedQuery.addEventListener('change', resize);
+    mobileQuery.addEventListener('change',resize);
+    reducedQuery.addEventListener('change',resize);
   }
 
-  resize();
-  animationFrame = requestAnimationFrame(animate);
+  try {
+    initializePrograms();
+    resize();
+    animationFrame = requestAnimationFrame(animate);
+  } catch (error) {
+    canvas.remove();
+    hero.classList.add('hero-pigment-fallback');
+    console.error(error);
+  }
 }());
