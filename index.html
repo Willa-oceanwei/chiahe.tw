@@ -23,8 +23,6 @@
     <link rel="stylesheet" href="assets/css/main.css" />
     <noscript><link rel="stylesheet" href="assets/css/noscript.css" /></noscript>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/vanta/0.5.21/vanta.halo.min.js"></script>
 </head>
 
 
@@ -61,32 +59,8 @@
 			</div>
 		</section>
 
-		<!-- VANTA.HALO Script -->
-		<script>
-		VANTA.HALO({
-    		el: "#intro",
-    		mouseControls: true,
-    		touchControls: true,
-    		gyroControls: false,
-    		minHeight: 400.00,
-   		 	minWidth: 400.00,
-    		baseColor: 0x001a59,
-    		backgroundColor: 0x131a43,
-    		size: 1,
-    		amplitudeFactor: 2.2,
-    		xOffset: 0.25,
-    		yOffset: 0.1,
-    		lightDirectionX: -1.5,
-    		lightDirectionY: 0.3,
-    		autopilot: true,
-    		speed: 1.0,
-    		cohesion: 0.4
-		});
-
-		window.onload = function () {
-    		window.dispatchEvent(new Event("resize"));
-		};
-		</script>
+		<!-- Hero pigment mixing animation -->
+		<script src="assets/js/hero-pigment.js"></script>
 
 		<!-- Section One -->
 		<section id="one" class="wrapper style2 spotlights">
