@@ -20,10 +20,6 @@
     mouseSwirlForce: 1.18,
     mouseWakeForce: 1.65,
     mouseAttractionForce: 0.24,
-    pigmentCarryLifetime: 1.4,
-    mixedLifetime: 4.8,
-    mixedSizeMultiplier: 1.35,
-    mixedOpacityMultiplier: 1.22,
     collisionIntervalMin: 4.8,
     collisionIntervalMax: 7.5,
     approachDuration: 1.55,
@@ -48,6 +44,9 @@
 
   window.HERO_PIGMENT_CONFIG = PIGMENT_CONFIG;
   window.HERO_PIGMENT_PALETTE = PALETTE;
+  const debugMode = new URLSearchParams(window.location.search).get('debugPigment');
+  const DEBUG_GPU_MOTION = debugMode!==null;
+  const GPU_SANITY_MOTION = debugMode==='sanity';
 
   const hero = document.getElementById('intro');
   if (!hero) return;
@@ -77,8 +76,6 @@
     vx: 0, vy: 0, active: 0
   };
   const resonance = { x: 0, y: 0, age: 99 };
-  const pigmentCarry = { group: -1, age: 99, mixAge: 0 };
-  const waveMix = { first: 0, second: 1 };
   const fieldCollision = {
     first: 0, second: 1, age: 99, next: 2.4, active: false
   };
@@ -102,6 +99,8 @@
   let elapsed = 0;
   let visible = !document.hidden;
   let currentCenters = new Float32Array(10);
+  let frameCount = 0;
+  let lastDebugPositions = null;
 
   const random = (min, max) => min + Math.random() * (max - min);
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -112,7 +111,6 @@
     layout(location=1) in vec2 aVelocity;
     layout(location=2) in float aSeed;
     layout(location=3) in float aGroup;
-    layout(location=4) in vec2 aMixState;
 
     uniform float uTime;
     uniform float uDelta;
@@ -124,16 +122,13 @@
     uniform vec4 uMouse;
     uniform vec2 uMouseVelocity;
     uniform vec4 uMouseForces;
-    uniform vec3 uCarry;
+    uniform float uDebugMotion;
     uniform vec4 uCollision;
     uniform vec2 uCollisionGroups;
     uniform vec4 uWave;
-    uniform vec2 uWaveMix;
-    uniform float uMixDecay;
 
     out vec2 vPosition;
     out vec2 vVelocity;
-    out vec2 vMixState;
 
     vec2 curlField(vec2 p, float seed) {
       // Analytic derivatives of three travelling wave potentials form a
@@ -152,9 +147,17 @@
     void main() {
       vec2 position = aPosition;
       vec2 velocity = aVelocity;
-      vec2 mixState = aMixState;
       int groupIndex = int(aGroup + 0.5);
       vec2 center = uCenters[groupIndex];
+
+      if (uDebugMotion > 0.5) {
+        velocity = vec2(0.10,0.0);
+        position += velocity*uDelta;
+        if (position.x>1.12) position.x=-0.12;
+        vPosition = position;
+        vVelocity = velocity;
+        return;
+      }
 
       // A bent ribbon target, rather than a circular point attractor, lets
       // each colour field stretch, fork and fold continuously.
@@ -184,10 +187,6 @@
         velocity -= direction*outer*(1.0-core)*uMouseForces.w*uDelta;
         velocity += tangentForce*(middle+outer*0.24)*uMouseForces.y*(0.65+speed*0.45)*uDelta;
         velocity += uMouseVelocity*outer*uMouseForces.z*(1.0+speed)*uDelta;
-        if (uCarry.x >= 0.0 && abs(aGroup-uCarry.x)>0.25) {
-          float carryMix = middle*uCarry.y*(0.32+speed*0.3);
-          if (carryMix>mixState.x) mixState = vec2(carryMix,uCarry.x);
-        }
       }
 
       // Expanding click ring applies force only near the moving wave front.
@@ -201,13 +200,6 @@
         vec2 waveDirection = waveDistance > 0.0001 ? waveDelta/waveDistance : vec2(1.0,0.0);
         velocity += waveDirection*ring*(1.25-waveProgress*0.45)*uDelta;
         velocity += vec2(-waveDirection.y,waveDirection.x)*ring*0.18*uDelta;
-        bool waveSelected = abs(aGroup-uWaveMix.x)<0.25 || abs(aGroup-uWaveMix.y)<0.25;
-        if (waveSelected && waveProgress<0.46) {
-          float target = abs(aGroup-uWaveMix.x)<0.25 ? uWaveMix.y : uWaveMix.x;
-          float compression = smoothstep(0.31,0.0,waveDistance)*(1.0-waveProgress/0.46);
-          velocity -= waveDirection*compression*0.48*uDelta;
-          if (compression*0.82>mixState.x) mixState = vec2(compression*0.82,target);
-        }
       }
 
       // The CPU selects two fields and a phase; this shader deforms every
@@ -236,10 +228,6 @@
           velocity += tangentCollision*wake*(0.9+0.5*sin(aSeed*23.0))*uDelta;
           velocity += curlField(position*5.0,aSeed+uTime)*wake*0.65*uDelta;
         }
-        float mixingProgress = clamp((phase-1.12)/1.65,0.0,1.0);
-        float mixingBand = smoothstep(0.43,0.015,contactDistance)*mixingProgress;
-        float otherGroup = abs(aGroup-uCollisionGroups.x)<0.25 ? uCollisionGroups.y : uCollisionGroups.x;
-        if (mixingBand>mixState.x) mixState = vec2(mixingBand,otherGroup);
       }
 
       velocity *= pow(uDamping,uDelta*60.0);
@@ -251,8 +239,6 @@
       if (position.y > 1.12) position.y = -0.12;
       vPosition = position;
       vVelocity = velocity;
-      mixState.x = max(0.0,mixState.x-uMixDecay*uDelta);
-      vMixState = mixState;
     }`;
 
   const PASSTHROUGH_FRAGMENT = `#version 300 es
@@ -266,13 +252,10 @@
     layout(location=1) in vec2 aVelocity;
     layout(location=2) in float aSeed;
     layout(location=3) in float aGroup;
-    layout(location=4) in vec2 aMixState;
     uniform float uAspect;
     uniform float uDpr;
     uniform float uPointMin;
     uniform float uPointMax;
-    uniform float uMixedSize;
-    uniform float uMixedOpacity;
     uniform vec3 uPalette[5];
     uniform vec4 uCollision;
     uniform vec2 uCollisionGroups;
@@ -288,13 +271,10 @@
       else if (distribution<0.75) pointSize = mix(uPointMin+1.0,uPointMin+3.0,localSeed);
       else if (distribution<0.95) pointSize = mix(uPointMin+2.5,uPointMax-2.0,localSeed);
       else pointSize = mix(uPointMax-2.0,uPointMax,localSeed);
-      float persistentMix = smoothstep(0.0,0.76,aMixState.x);
-      gl_PointSize = pointSize*mix(1.0,uMixedSize,persistentMix)*uDpr;
+      gl_PointSize = pointSize*uDpr;
       int groupIndex = int(aGroup+0.5);
       vec3 colour = uPalette[groupIndex];
       float alpha = mix(0.30,0.76,pow(distribution,0.72));
-      colour = mix(colour,uPalette[int(aMixState.y+0.5)],persistentMix*0.72);
-      alpha *= mix(1.0,uMixedOpacity,persistentMix);
 
       // Multiple perceptual interpolation positions create a colour ribbon,
       // rather than replacing both colliding fields with one flat mixed hue.
@@ -411,22 +391,60 @@
   }
 
   function initializePrograms() {
-    updateProgram = createProgram(UPDATE_VERTEX, PASSTHROUGH_FRAGMENT, ['vPosition', 'vVelocity', 'vMixState']);
+    updateProgram = createProgram(UPDATE_VERTEX, PASSTHROUGH_FRAGMENT, ['vPosition', 'vVelocity']);
     renderProgram = createProgram(RENDER_VERTEX, RENDER_FRAGMENT);
     backgroundProgram = createProgram(BACKGROUND_VERTEX, BACKGROUND_FRAGMENT);
     updateUniforms = locations(updateProgram, [
       'uTime','uDelta','uAspect','uFlowStrength','uClusterStrength','uDamping',
-      'uCenters[0]','uMouse','uMouseVelocity','uMouseForces','uCarry','uCollision',
-      'uCollisionGroups','uWave','uWaveMix','uMixDecay'
+      'uCenters[0]','uMouse','uMouseVelocity','uMouseForces','uDebugMotion',
+      'uCollision','uCollisionGroups','uWave'
     ]);
     renderUniforms = locations(renderProgram, [
-      'uAspect','uDpr','uPointMin','uPointMax','uMixedSize','uMixedOpacity',
-      'uPalette[0]','uCollision','uCollisionGroups'
+      'uAspect','uDpr','uPointMin','uPointMax','uPalette[0]','uCollision','uCollisionGroups'
     ]);
     backgroundUniforms = locations(backgroundProgram, [
       'uTime','uAspect','uCenters[0]','uPalette[0]','uCollision','uCollisionGroups'
     ]);
     emptyVao = gl.createVertexArray();
+    if (DEBUG_GPU_MOTION) {
+      const maximum = gl.getParameter(gl.MAX_TRANSFORM_FEEDBACK_SEPARATE_ATTRIBS);
+      const varyings = [0,1].map((index) => gl.getTransformFeedbackVarying(updateProgram,index).name);
+      console.debug('Hero pigment transform feedback', { maximum, varyings });
+      if (maximum<2 || varyings[0]!=='vPosition' || varyings[1]!=='vVelocity') {
+        throw new Error('Hero pigment transform-feedback layout is unsupported');
+      }
+    }
+  }
+
+  function debugGlError(stage) {
+    if (!DEBUG_GPU_MOTION) return;
+    const error = gl.getError();
+    if (error!==gl.NO_ERROR) console.error(`Hero pigment WebGL error after ${stage}:`,error);
+  }
+
+  function debugReadback() {
+    if (!DEBUG_GPU_MOTION || frameCount%120!==0) return;
+    const positions = new Float32Array(10);
+    const velocities = new Float32Array(10);
+    const renderedSet = particleSets[sourceIndex];
+    gl.bindBuffer(gl.COPY_READ_BUFFER,renderedSet.position);
+    gl.getBufferSubData(gl.COPY_READ_BUFFER,0,positions);
+    gl.bindBuffer(gl.COPY_READ_BUFFER,renderedSet.velocity);
+    gl.getBufferSubData(gl.COPY_READ_BUFFER,0,velocities);
+    gl.bindBuffer(gl.COPY_READ_BUFFER,null);
+    const movement = lastDebugPositions
+      ? Math.hypot(positions[0]-lastDebugPositions[0],positions[1]-lastDebugPositions[1])
+      : null;
+    console.debug('Hero pigment GPU motion', {
+      frame: frameCount,
+      elapsed,
+      sourceIndex,
+      movement,
+      positions: Array.from(positions),
+      velocities: Array.from(velocities),
+      error: gl.getError()
+    });
+    lastDebugPositions = positions;
   }
 
   function createBuffer(data, usage) {
@@ -441,7 +459,6 @@
     const velocities = new Float32Array(count * 2);
     const seeds = new Float32Array(count);
     const groups = new Float32Array(count);
-    const mixes = new Float32Array(count * 2);
     for (let index=0;index<count;index+=1) {
       const group = index % PIGMENT_CONFIG.clusterCount;
       const band = Math.floor(index/PIGMENT_CONFIG.clusterCount) / Math.ceil(count/PIGMENT_CONFIG.clusterCount);
@@ -456,12 +473,11 @@
       velocities[index*2+1] = random(-0.025,0.025);
       seeds[index] = Math.random();
       groups[index] = group;
-      mixes[index*2+1] = group;
     }
-    return { positions, velocities, seeds, groups, mixes };
+    return { positions, velocities, seeds, groups };
   }
 
-  function createParticleSet(positionData, velocityData, mixData, seedBuffer, groupBuffer) {
+  function createParticleSet(positionData, velocityData, seedBuffer, groupBuffer) {
     const position = createBuffer(positionData, gl.DYNAMIC_COPY);
     const velocity = createBuffer(velocityData, gl.DYNAMIC_COPY);
     const vao = gl.createVertexArray();
@@ -478,11 +494,7 @@
     gl.bindBuffer(gl.ARRAY_BUFFER, groupBuffer);
     gl.enableVertexAttribArray(3);
     gl.vertexAttribPointer(3,1,gl.FLOAT,false,0,0);
-    const mix = createBuffer(mixData, gl.DYNAMIC_COPY);
-    gl.bindBuffer(gl.ARRAY_BUFFER, mix);
-    gl.enableVertexAttribArray(4);
-    gl.vertexAttribPointer(4,2,gl.FLOAT,false,0,0);
-    return { position, velocity, mix, vao };
+    return { position, velocity, vao };
   }
 
   function destroyParticleSets() {
@@ -493,7 +505,6 @@
     particleSets.forEach((set) => {
       gl.deleteBuffer(set.position);
       gl.deleteBuffer(set.velocity);
-      gl.deleteBuffer(set.mix);
       gl.deleteVertexArray(set.vao);
     });
     particleSets = [];
@@ -508,8 +519,8 @@
     const seedBuffer = createBuffer(state.seeds, gl.STATIC_DRAW);
     const groupBuffer = createBuffer(state.groups, gl.STATIC_DRAW);
     particleSets = [
-      createParticleSet(state.positions,state.velocities,state.mixes,seedBuffer,groupBuffer),
-      createParticleSet(state.positions,state.velocities,state.mixes,seedBuffer,groupBuffer)
+      createParticleSet(state.positions,state.velocities,seedBuffer,groupBuffer),
+      createParticleSet(state.positions,state.velocities,seedBuffer,groupBuffer)
     ];
     // VAOs retain these buffers; mark ownership on the first set for cleanup.
     particleSets[0].seed = seedBuffer;
@@ -571,46 +582,6 @@
     return [(centers[a]+centers[b])*0.5,(centers[a+1]+centers[b+1])*0.5];
   }
 
-  function nearestGroups(x, y, centers) {
-    const distances = [];
-    for (let group=0;group<5;group+=1) {
-      const dx = (x-centers[group*2])*aspect;
-      const dy = y-centers[group*2+1];
-      distances.push({ group, distance: Math.hypot(dx,dy) });
-    }
-    distances.sort((a,b) => a.distance-b.distance);
-    return distances;
-  }
-
-  function updatePigmentCarry(delta, centers) {
-    pigmentCarry.age += delta;
-    if (!pointer.active) {
-      pigmentCarry.mixAge = 0;
-      return;
-    }
-    const nearest = nearestGroups(pointer.x,pointer.y,centers)[0];
-    if (nearest.distance>0.3) return;
-    if (pigmentCarry.group<0 || pigmentCarry.age>PIGMENT_CONFIG.pigmentCarryLifetime) {
-      pigmentCarry.group = nearest.group;
-      pigmentCarry.age = 0;
-      pigmentCarry.mixAge = 0;
-      return;
-    }
-    if (nearest.group===pigmentCarry.group) {
-      pigmentCarry.age = 0;
-      pigmentCarry.mixAge = 0;
-      return;
-    }
-    pigmentCarry.mixAge += delta;
-    if (pigmentCarry.mixAge>0.28 && !fieldCollision.active) {
-      fieldCollision.first = pigmentCarry.group;
-      fieldCollision.second = nearest.group;
-      fieldCollision.age = PIGMENT_CONFIG.approachDuration*0.72;
-      fieldCollision.active = true;
-      pigmentCarry.mixAge = 0;
-    }
-  }
-
   function setInteractionUniforms(uniforms, centers, collisionPhase) {
     const contact = collisionPoint(centers);
     gl.uniform1f(uniforms.uAspect,aspect);
@@ -622,6 +593,9 @@
   function updateParticles(delta, centers, collisionPhase) {
     const source = particleSets[sourceIndex];
     const target = particleSets[1-sourceIndex];
+    if (source.position===target.position || source.velocity===target.velocity) {
+      throw new Error('Hero pigment transform-feedback buffers are aliased');
+    }
     gl.useProgram(updateProgram);
     gl.bindVertexArray(source.vao);
     gl.uniform1f(updateUniforms.uTime,elapsed);
@@ -632,23 +606,24 @@
     gl.uniform4f(updateUniforms.uMouse,pointer.x,pointer.y,pointer.active,PIGMENT_CONFIG.mouseOuterRadius);
     gl.uniform2f(updateUniforms.uMouseVelocity,pointer.vx,pointer.vy);
     gl.uniform4f(updateUniforms.uMouseForces,PIGMENT_CONFIG.mouseRadialForce,PIGMENT_CONFIG.mouseSwirlForce,PIGMENT_CONFIG.mouseWakeForce,PIGMENT_CONFIG.mouseAttractionForce);
-    gl.uniform3f(updateUniforms.uCarry,pigmentCarry.group,clamp(1-pigmentCarry.age/PIGMENT_CONFIG.pigmentCarryLifetime,0,1),PIGMENT_CONFIG.pigmentCarryLifetime);
     gl.uniform4f(updateUniforms.uWave,resonance.x,resonance.y,resonance.age,PIGMENT_CONFIG.resonanceDuration);
-    gl.uniform2f(updateUniforms.uWaveMix,waveMix.first,waveMix.second);
-    gl.uniform1f(updateUniforms.uMixDecay,1/PIGMENT_CONFIG.mixedLifetime);
+    gl.uniform1f(updateUniforms.uDebugMotion,GPU_SANITY_MOTION ? 1 : 0);
     setInteractionUniforms(updateUniforms,centers,collisionPhase);
     gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,0,target.position);
     gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,1,target.velocity);
-    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,2,target.mix);
+    debugGlError('bindBufferBase');
     gl.enable(gl.RASTERIZER_DISCARD);
     gl.beginTransformFeedback(gl.POINTS);
+    debugGlError('beginTransformFeedback');
     gl.drawArrays(gl.POINTS,0,particleCount);
+    debugGlError('drawArrays');
     gl.endTransformFeedback();
+    debugGlError('endTransformFeedback');
     gl.disable(gl.RASTERIZER_DISCARD);
     gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,0,null);
     gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,1,null);
-    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,2,null);
     sourceIndex = 1-sourceIndex;
+    debugReadback();
   }
 
   function drawBackground(centers, collisionPhase) {
@@ -669,8 +644,6 @@
     gl.uniform1f(renderUniforms.uDpr,dpr);
     gl.uniform1f(renderUniforms.uPointMin,PIGMENT_CONFIG.pointSizeMin);
     gl.uniform1f(renderUniforms.uPointMax,PIGMENT_CONFIG.pointSizeMax);
-    gl.uniform1f(renderUniforms.uMixedSize,PIGMENT_CONFIG.mixedSizeMultiplier);
-    gl.uniform1f(renderUniforms.uMixedOpacity,PIGMENT_CONFIG.mixedOpacityMultiplier);
     setPalette(renderUniforms['uPalette[0]']);
     setInteractionUniforms(renderUniforms,centers,collisionPhase);
     gl.drawArrays(gl.POINTS,0,particleCount);
@@ -682,15 +655,18 @@
     const delta = reducedQuery.matches ? rawDelta*0.16 : rawDelta;
     lastTime = time;
     elapsed += delta;
+    frameCount += 1;
     resonance.age += rawDelta;
     const collisionPhase = updateCollision(rawDelta);
     currentCenters = clusterCenters(elapsed);
-    updatePigmentCarry(rawDelta,currentCenters);
     updateParticles(delta,currentCenters,collisionPhase);
     drawBackground(currentCenters,collisionPhase);
     drawParticles(currentCenters,collisionPhase);
     pointer.vx *= 0.82;
     pointer.vy *= 0.82;
+    if (DEBUG_GPU_MOTION && frameCount%120===0) {
+      console.debug('Hero pigment animation frame', { frame: frameCount, elapsed, delta, sourceIndex });
+    }
     animationFrame = requestAnimationFrame(animate);
   }
 
@@ -722,10 +698,22 @@
     resonance.x = position[0];
     resonance.y = position[1];
     resonance.age = 0;
-    const nearest = nearestGroups(position[0],position[1],currentCenters);
-    waveMix.first = nearest[0].group;
-    waveMix.second = nearest[1].distance<0.38 ? nearest[1].group : nearest[0].group;
   },{passive:true});
+  canvas.addEventListener('webglcontextlost',(event) => {
+    event.preventDefault();
+    visible = false;
+    cancelAnimationFrame(animationFrame);
+    console.warn('Hero pigment WebGL context lost');
+  });
+  canvas.addEventListener('webglcontextrestored',() => {
+    console.info('Hero pigment WebGL context restored');
+    particleSets = [];
+    initializePrograms();
+    resize();
+    visible = !document.hidden;
+    lastTime = performance.now();
+    if (visible) animationFrame = requestAnimationFrame(animate);
+  });
   document.addEventListener('visibilitychange',() => {
     visible = !document.hidden;
     cancelAnimationFrame(animationFrame);
