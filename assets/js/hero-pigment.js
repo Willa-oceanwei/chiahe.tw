@@ -38,7 +38,7 @@
     [0.12, 0.72, 0.78], [0.88, 0.24, 0.56], [0.96, 0.70, 0.18],
     [0.96, 0.40, 0.17], [0.57, 0.25, 0.92]
   ];
-  const LOGO_MASK_URL = 'chiahe_logo_transparent.png?v=20260910-2';
+  const LOGO_MASK_URL = 'images/chiahe_logo_transparent.png?v=20260910-3';
 
   window.HERO_PIGMENT_CONFIG = PIGMENT_CONFIG;
   window.HERO_PIGMENT_PALETTE = PALETTE;
@@ -198,10 +198,10 @@
     out vec2 vPosition;
     out vec2 vVelocity;
 
-    vec2 curlField(vec2 p, float seed) {
+    vec2 curlField(vec2 samplePosition, float seed) {
       // Analytic derivatives of three travelling wave potentials form a
       // divergence-light curl field without CPU noise sampling.
-      vec2 q = vec2(p.x * uAspect, p.y);
+      vec2 q = vec2(samplePosition.x * uAspect, samplePosition.y);
       float t = uTime * 0.12;
       float dX = 2.7*cos(dot(q,vec2(2.7,1.9))+t+seed*4.0)
                - 2.1*sin(dot(q,vec2(-2.1,3.1))-t*0.73+seed);
@@ -326,8 +326,12 @@
       if(p.x<-.08||p.x>1.13||p.y<-.1||p.y>1.1){ p=mix(p,aHome,.065); v*=.65; }
       vPosition=p; vVelocity=v;
     }`;
+
   const PASS_FRAGMENT = `#version 300 es
-    precision mediump float; void main() {}`;
+    precision mediump float;
+    void main() { }
+  `;
+
   const RENDER_VERTEX = `#version 300 es
     precision highp float;
     layout(location=0) in vec2 aPosition;
@@ -463,7 +467,7 @@
   }
 
   function initializePrograms() {
-    updateProgram = createProgram(UPDATE_VERTEX, PASSTHROUGH_FRAGMENT, ['vPosition', 'vVelocity']);
+    updateProgram = createProgram(UPDATE_VERTEX, PASS_FRAGMENT, ['vPosition', 'vVelocity']);
     renderProgram = createProgram(RENDER_VERTEX, RENDER_FRAGMENT);
     backgroundProgram = createProgram(BACKGROUND_VERTEX, BACKGROUND_FRAGMENT);
     updateUniforms = locations(updateProgram, [
