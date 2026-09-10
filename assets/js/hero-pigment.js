@@ -121,8 +121,8 @@
     layout(location=0) in vec2 aPosition; layout(location=1) in vec2 aVelocity;
     layout(location=2) in float aSeed; layout(location=3) in float aGroup;
     layout(location=4) in float aKind; layout(location=5) in vec2 aHome;
-    uniform float uAspect,uDpr,uPointMin,uPointMax,uPhase,uEnergy; uniform vec2 uCore; uniform vec3 uPalette[5];
-    out vec4 vColour;
+    uniform float uAspect,uDpr,uPointMin,uPointMax,uPhase,uEnergy,uTime; uniform vec2 uCore; uniform vec3 uPalette[5];
+    out vec4 vColour; out float vGlow;
     void main(){
       gl_Position=vec4(aPosition.x*2.0-1.0,1.0-aPosition.y*2.0,0,1);
       float distribution=fract(aSeed*17.731), kindSize=aKind<.5?.82:(aKind<1.5?1.05:.78);
@@ -137,11 +137,14 @@
       colour=mix(colour,uPalette[4],newColour);
       if(aKind<.5) colour=mix(colour,vec3(.67,.57,.72),.28);
       float alpha=aKind<.5?mix(.48,.78,distribution):mix(.30,.72,distribution);
-      alpha+=newColour*.24; gl_PointSize=size*uDpr*(1.0+newColour*.28); vColour=vec4(colour,alpha);
+      float foreground=smoothstep(.90,.985,fract(aSeed*29.71));
+      float shimmer=.72+.28*sin(uTime*1.35+aSeed*41.0);
+      vGlow=clamp(foreground*shimmer+newColour*.82+impact*smoothstep(.2,0.0,d)*.45,0.0,1.0);
+      alpha+=newColour*.24+vGlow*.10; gl_PointSize=size*uDpr*(1.0+newColour*.28+foreground*.18); vColour=vec4(colour,alpha);
     }`;
   const RENDER_FRAGMENT = `#version 300 es
-    precision mediump float; in vec4 vColour; out vec4 outColour;
-    void main(){ vec2 q=gl_PointCoord*2.0-1.0; float r=dot(q,q); if(r>1.0)discard; float halo=smoothstep(1.0,.03,r); float core=smoothstep(.24,0.0,r); outColour=vec4(vColour.rgb*(1.0+core*.18),vColour.a*(halo*.72+core*.28)); }`;
+    precision mediump float; in vec4 vColour; in float vGlow; out vec4 outColour;
+    void main(){ vec2 q=gl_PointCoord*2.0-1.0; float r=dot(q,q); if(r>1.0)discard; float halo=smoothstep(1.0,.03,r); float core=smoothstep(.24,0.0,r); vec3 luminous=vColour.rgb*(1.0+core*(.18+vGlow*.48)+halo*vGlow*.12); outColour=vec4(luminous,vColour.a*(halo*.72+core*.28)); }`;
   const BACKGROUND_VERTEX = `#version 300 es
     precision highp float; out vec2 vUv; void main(){ vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);vUv=p;gl_Position=vec4(p*2.0-1.0,0,1);}`;
   const BACKGROUND_FRAGMENT = `#version 300 es
@@ -170,7 +173,7 @@
   function initPrograms(){
     updateProgram=program(UPDATE_VERTEX,PASS_FRAGMENT,['vPosition','vVelocity']); renderProgram=program(RENDER_VERTEX,RENDER_FRAGMENT); backgroundProgram=program(BACKGROUND_VERTEX,BACKGROUND_FRAGMENT);
     updateU=locations(updateProgram,['uTime','uDelta','uAspect','uPhase','uEnergy','uCore','uMouse','uMouseVelocity']);
-    renderU=locations(renderProgram,['uAspect','uDpr','uPointMin','uPointMax','uPhase','uEnergy','uCore','uPalette[0]']);
+    renderU=locations(renderProgram,['uAspect','uDpr','uPointMin','uPointMax','uPhase','uEnergy','uTime','uCore','uPalette[0]']);
     backgroundU=locations(backgroundProgram,['uTime','uAspect','uPhase','uEnergy','uCore','uPalette[0]']); emptyVao=gl.createVertexArray();
   }
   function loadLogoMask(){
@@ -242,7 +245,7 @@
   }
   function draw(phase){
     gl.disable(gl.BLEND);gl.useProgram(backgroundProgram);gl.bindVertexArray(emptyVao);setCommon(backgroundU,phase);gl.uniform1f(backgroundU.uTime,elapsed);gl.uniform3fv(backgroundU['uPalette[0]'],new Float32Array(PALETTE.flat()));gl.drawArrays(gl.TRIANGLES,0,3);
-    gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.useProgram(renderProgram);gl.bindVertexArray(sets[source].vao);setCommon(renderU,phase);gl.uniform1f(renderU.uDpr,dpr);gl.uniform1f(renderU.uPointMin,CONFIG.pointSizeMin);gl.uniform1f(renderU.uPointMax,CONFIG.pointSizeMax);gl.uniform3fv(renderU['uPalette[0]'],new Float32Array(PALETTE.flat()));gl.drawArrays(gl.POINTS,0,count);
+    gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.useProgram(renderProgram);gl.bindVertexArray(sets[source].vao);setCommon(renderU,phase);gl.uniform1f(renderU.uDpr,dpr);gl.uniform1f(renderU.uPointMin,CONFIG.pointSizeMin);gl.uniform1f(renderU.uPointMax,CONFIG.pointSizeMax);gl.uniform1f(renderU.uTime,elapsed);gl.uniform3fv(renderU['uPalette[0]'],new Float32Array(PALETTE.flat()));gl.drawArrays(gl.POINTS,0,count);
   }
   function resize(){ if(!logoMask)return;const r=hero.getBoundingClientRect();width=Math.max(1,r.width);height=Math.max(1,r.height);aspect=width/height;dpr=Math.min(devicePixelRatio||1,mobileQuery.matches?CONFIG.mobileDprCap:CONFIG.desktopDprCap);canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);canvas.style.width=width+'px';canvas.style.height=height+'px';gl.viewport(0,0,canvas.width,canvas.height);initParticles(); }
   function animate(now){ if(!visible)return;const raw=Math.min(.033,(now-lastTime)/1000||.0167),dt=reducedQuery.matches?raw*.12:raw;lastTime=now;elapsed+=dt;const phase=collisionPhase(raw);update(dt,phase);draw(phase);pointer.vx*=.76;pointer.vy*=.76;frame=requestAnimationFrame(animate); }
