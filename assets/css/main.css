@@ -3893,6 +3893,78 @@ input, select, textarea {
 			z-index: 0;
 		}
 
+		#intro .hero-copy {
+			position: relative;
+			z-index: 2;
+			align-self: flex-end;
+			max-width: 760px;
+			padding-top: 7rem;
+			padding-bottom: clamp(3rem, 8vh, 6rem);
+		}
+
+		#intro .hero-copy__header,
+		#intro .hero-copy__body,
+		#intro .hero-copy__signature {
+			margin: 0;
+		}
+
+		#intro .hero-copy__eyebrow {
+			margin: 0 0 0.3rem;
+			font-size: 0.68rem;
+			font-weight: 600;
+			letter-spacing: 0.32em;
+			line-height: 1.4;
+		}
+
+		#intro .hero-copy__kicker {
+			margin: 0;
+			font-size: clamp(0.95rem, 1.35vw, 1.15rem);
+			font-weight: 400;
+			letter-spacing: 0.1em;
+		}
+
+		#intro .hero-copy__title {
+			margin: clamp(1.3rem, 3vh, 2.2rem) 0 1.5rem;
+			font-size: clamp(2.65rem, 5.7vw, 5.6rem);
+			font-weight: 600;
+			letter-spacing: -0.045em;
+			line-height: 1.04;
+		}
+
+		#intro .hero-copy__title span {
+			display: block;
+			white-space: nowrap;
+		}
+
+		#intro .hero-copy__title span + span {
+			transform: translateX(clamp(0.7rem, 3.5vw, 3.2rem));
+		}
+
+		#intro .hero-copy__body {
+			max-width: 500px;
+			font-size: clamp(0.9rem, 1.15vw, 1.05rem);
+			line-height: 1.9;
+		}
+
+		#intro .hero-copy__signature {
+			display: flex;
+			flex-direction: column;
+			gap: 0.25rem;
+			margin-top: clamp(1.8rem, 4vh, 3.25rem);
+			font-size: 0.68rem;
+			letter-spacing: 0.16em;
+			line-height: 1.5;
+			text-transform: uppercase;
+		}
+
+		#intro .hero-copy__signature strong {
+			font-weight: 600;
+		}
+
+		#intro .hero-copy__signature span {
+			opacity: 0.68;
+		}
+
 		#intro p {
 			font-size: 1.25em;
 		}
@@ -3906,6 +3978,24 @@ input, select, textarea {
 			}
 
 			@media screen and (max-width: 736px) {
+
+				#intro .hero-copy {
+					padding: 6rem 1.5rem 2.5rem;
+				}
+
+				#intro .hero-copy__title {
+					font-size: clamp(2.25rem, 11vw, 3.4rem);
+					letter-spacing: -0.05em;
+				}
+
+				#intro .hero-copy__title span + span {
+					transform: translateX(0.5rem);
+				}
+
+				#intro .hero-copy__body {
+					font-size: 0.86rem;
+					line-height: 1.75;
+				}
 
 				#intro p {
 					font-size: 1em;

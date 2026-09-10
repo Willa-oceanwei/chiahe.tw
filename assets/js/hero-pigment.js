@@ -4,8 +4,10 @@
   'use strict';
 
   const CONFIG = {
-    desktopCount: 20000, mobileCount: 8000, reducedMotionCount: 2800,
-    skeletonRatio: 0.42, flowRatio: 0.30, freeRatio: 0.28,
+    desktopCount: 60000, mobileCount: 24000, reducedMotionCount: 8400,
+    // Keep the original absolute Logo counts; the added capacity belongs to
+    // the fine outer orbit (roughly eight times its previous population).
+    skeletonRatio: 0.14, flowRatio: 0.10, freeRatio: 0.76,
     pointSizeMin: 1.35, pointSizeMax: 6.8,
     approachDuration: 1.28, compressionDuration: 0.48, impactDuration: 0.38,
     ribbonDuration: 4.4, reformDuration: 4.2,
