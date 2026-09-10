@@ -3,21 +3,44 @@
 (function () {
   'use strict';
 
-  const CONFIG = {
-    desktopCount: 20000, mobileCount: 8000, reducedMotionCount: 2800,
-    skeletonRatio: 0.42, flowRatio: 0.30, freeRatio: 0.28,
-    pointSizeMin: 1.35, pointSizeMax: 6.8,
-    approachDuration: 1.18, compressionDuration: 0.42, impactDuration: 0.32,
-    ribbonDuration: 3.6, reformDuration: 4.2,
-    collisionIntervalMin: 4.8, collisionIntervalMax: 7.4,
-    collisionRadius: 0.145, desktopDprCap: 1.65, mobileDprCap: 1.25
+  const PIGMENT_CONFIG = {
+    desktopCount: 24000,
+    mobileCount: 9000,
+    reducedMotionCount: 2500,
+    clusterCount: 5,
+    pointSizeMin: 0.72,
+    pointSizeMax: 2.35,
+    flowScale: 3.2,
+    flowStrength: 0.34,
+    clusterStrength: 0.18,
+    damping: 0.986,
+    mouseInnerRadius: 0.105,
+    mouseOuterRadius: 0.29,
+    mouseRadialForce: 1.35,
+    mouseSwirlForce: 0.72,
+    mouseWakeForce: 0.95,
+    collisionIntervalMin: 4.8,
+    collisionIntervalMax: 7.5,
+    approachDuration: 1.55,
+    compressionDuration: 0.72,
+    impactDuration: 0.48,
+    wakeDuration: 3.1,
+    collisionRadius: 0.22,
+    collisionImpulse: 2.15,
+    resonanceDuration: 2.15,
+    resonanceMaxRadius: 0.58,
+    logoParticleRatio: 0.40,
+    logoAttractionStrength: 0.035,
+    desktopDprCap: 1.65,
+    mobileDprCap: 1.25
   };
   const PALETTE = [
     [0.12, 0.72, 0.78], [0.88, 0.24, 0.56], [0.96, 0.70, 0.18],
     [0.96, 0.40, 0.17], [0.57, 0.25, 0.92]
   ];
-  const LOGO_MASK_URL = 'chiahe_logo_transparent.png';
-  window.HERO_PIGMENT_CONFIG = CONFIG;
+  const LOGO_MASK_URL = 'images/chiahe-logo-symbol.png';
+
+  window.HERO_PIGMENT_CONFIG = PIGMENT_CONFIG;
   window.HERO_PIGMENT_PALETTE = PALETTE;
 
   const hero = document.getElementById('intro');
@@ -26,77 +49,187 @@
   canvas.className = 'hero-pigment-canvas';
   canvas.setAttribute('aria-hidden', 'true');
   hero.insertBefore(canvas, hero.firstChild);
-  const gl = canvas.getContext('webgl2', { alpha: false, antialias: false, depth: false, powerPreference: 'high-performance' });
-  if (!gl) { canvas.remove(); hero.classList.add('hero-pigment-fallback'); return; }
 
-  const mobileQuery = matchMedia('(max-width: 736px)');
-  const reducedQuery = matchMedia('(prefers-reduced-motion: reduce)');
-  const pointer = { x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, active: 0 };
-  const collision = { age: 99, next: 2.2, active: false, energy: 0.62 };
-  let width = 1, height = 1, aspect = 1, dpr = 1, count = 0, source = 0;
-  let sets = [], updateProgram, renderProgram, backgroundProgram, updateU, renderU, backgroundU, emptyVao;
-  let frame = 0, lastTime = performance.now(), elapsed = 0, visible = !document.hidden, logoMask;
-  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-  const random = (a, b) => a + Math.random() * (b - a);
+  const gl = canvas.getContext('webgl2', {
+    alpha: false,
+    antialias: false,
+    depth: false,
+    powerPreference: 'high-performance',
+    preserveDrawingBuffer: false
+  });
+  if (!gl) {
+    canvas.remove();
+    hero.classList.add('hero-pigment-fallback');
+    return;
+  }
+
+  const mobileQuery = window.matchMedia('(max-width: 736px)');
+  const reducedQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const pointer = {
+    x: 0, y: 0, previousX: 0, previousY: 0,
+    vx: 0, vy: 0, active: 0
+  };
+  const resonance = { x: 0, y: 0, age: 99 };
+  const fieldCollision = {
+    first: 0, second: 1, age: 99, next: 2.4, active: false
+  };
+
+  let width = 1;
+  let height = 1;
+  let aspect = 1;
+  let dpr = 1;
+  let particleCount = 0;
+  let sourceIndex = 0;
+  let particleSets = [];
+  let updateProgram;
+  let renderProgram;
+  let backgroundProgram;
+  let updateUniforms;
+  let renderUniforms;
+  let backgroundUniforms;
+  let emptyVao;
+  let animationFrame = 0;
+  let lastTime = performance.now();
+  let elapsed = 0;
+  let visible = !document.hidden;
+  let logoTexture;
+  let logoPoints = [];
+
+  const random = (min, max) => min + Math.random() * (max - min);
+  const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
   const UPDATE_VERTEX = `#version 300 es
     precision highp float;
-    layout(location=0) in vec2 aPosition; layout(location=1) in vec2 aVelocity;
-    layout(location=2) in float aSeed; layout(location=3) in float aGroup;
-    layout(location=4) in float aKind; layout(location=5) in vec2 aHome;
-    uniform float uTime,uDelta,uAspect,uPhase,uEnergy; uniform vec2 uCore;
-    uniform vec4 uMouse; uniform vec2 uMouseVelocity;
-    out vec2 vPosition; out vec2 vVelocity;
+    layout(location=0) in vec2 aPosition;
+    layout(location=1) in vec2 aVelocity;
+    layout(location=2) in float aSeed;
+    layout(location=3) in float aGroup;
 
-    vec2 metric(vec2 v){ return vec2(v.x*uAspect,v.y); }
-    vec2 curl(vec2 p,float s){
-      float a=sin(p.x*17.0+p.y*11.0+uTime*.42+s*6.0);
-      float b=cos(p.x*9.0-p.y*19.0-uTime*.31+s*4.0);
-      return vec2(a+b*.4,-b+a*.35);
+    uniform float uTime;
+    uniform float uDelta;
+    uniform float uAspect;
+    uniform float uFlowStrength;
+    uniform float uClusterStrength;
+    uniform float uDamping;
+    uniform vec2 uCenters[5];
+    uniform vec4 uMouse;
+    uniform vec2 uMouseVelocity;
+    uniform vec4 uCollision;
+    uniform vec2 uCollisionGroups;
+    uniform vec4 uWave;
+    uniform sampler2D uLogoMask;
+    uniform vec3 uLogoField;
+
+    out vec2 vPosition;
+    out vec2 vVelocity;
+
+    vec2 curlField(vec2 p, float seed) {
+      // Analytic derivatives of three travelling wave potentials form a
+      // divergence-light curl field without CPU noise sampling.
+      vec2 q = vec2(p.x * uAspect, p.y);
+      float t = uTime * 0.12;
+      float dX = 2.7*cos(dot(q,vec2(2.7,1.9))+t+seed*4.0)
+               - 2.1*sin(dot(q,vec2(-2.1,3.1))-t*0.73+seed);
+      float dY = 1.9*cos(dot(q,vec2(2.7,1.9))+t+seed*4.0)
+               + 3.1*sin(dot(q,vec2(-2.1,3.1))-t*0.73+seed);
+      dX += 1.35*cos(dot(q,vec2(1.35,-3.7))+t*0.51-seed*2.0);
+      dY -= 3.7*cos(dot(q,vec2(1.35,-3.7))+t*0.51-seed*2.0);
+      return vec2(dY, -dX) * 0.12;
     }
-    void main(){
-      vec2 p=aPosition, v=aVelocity, toHome=aHome-p;
-      float phase=uPhase, homeDistance=length(metric(toHome));
-      bool skeleton=aKind<.5, internal=aKind>.5&&aKind<1.5;
-      float reform=phase>3.0 ? smoothstep(3.0,4.0,phase) : 0.0;
 
-      // Forty-two percent of particles remain a legible, breathing outline.
-      if(skeleton){
-        v += toHome*(2.9+reform*2.4)*uDelta;
-        v += curl(p*2.0,aSeed)*.018*uDelta;
-        v *= pow(.91,uDelta*60.0);
-      } else if(internal){
-        v += toHome*(.88+reform*1.5)*uDelta;
-        vec2 tangent = aGroup<.5 ? normalize(vec2(-toHome.y,toHome.x)) :
-                       aGroup<1.5 ? normalize(vec2(toHome.y,-toHome.x)) : vec2(1.0,0.0);
-        v += tangent*(.11+.05*sin(aSeed*31.0+uTime))*uDelta;
-        v += curl(p*2.6,aSeed)*.055*uDelta;
-      } else {
-        v += toHome*(.20+reform*.75)*uDelta;
-        v += curl(p*2.1,aSeed)*.075*uDelta;
+    void main() {
+      vec2 position = aPosition;
+      vec2 velocity = aVelocity;
+      int groupIndex = int(aGroup + 0.5);
+      vec2 center = uCenters[groupIndex];
+
+      // A bent ribbon target, rather than a circular point attractor, lets
+      // each colour field stretch, fork and fold continuously.
+      float strand = sin(position.y*7.0 + uTime*0.18 + aSeed*6.283);
+      vec2 tangent = normalize(vec2(
+        cos(uTime*0.09 + float(groupIndex)*1.4),
+        sin(uTime*0.11 + float(groupIndex)*1.7)
+      ));
+      vec2 ribbonTarget = center + tangent * strand * (0.14 + 0.055*sin(aSeed*19.0));
+      vec2 toRibbon = ribbonTarget - position;
+      float ribbonDistance = length(toRibbon);
+      velocity += toRibbon * uClusterStrength * (0.35 + smoothstep(0.05,0.7,ribbonDistance)) * uDelta;
+      velocity += curlField(position*3.2 + center, aSeed) * uFlowStrength * uDelta;
+
+      // The logo is a low-priority density/flow bias for only 40% of the field.
+      // Inside the mask particles remain free; cohesion appears only near its
+      // boundary or after a particle has travelled well away from the mark.
+      if (fract(aSeed*7.137) < 0.40) {
+        vec2 logoUv = vec2(
+          (position.x-uLogoField.x)*uAspect/uLogoField.y+0.5,
+          (position.y-0.5)/uLogoField.y+0.5
+        );
+        bool inBounds = all(greaterThanEqual(logoUv,vec2(0.0))) && all(lessThanEqual(logoUv,vec2(1.0)));
+        float mask = inBounds ? texture(uLogoMask,logoUv).a : 0.0;
+        vec2 texel = vec2(1.0/420.0);
+        vec2 gradient = vec2(
+          texture(uLogoMask,logoUv+vec2(texel.x,0.0)).a-texture(uLogoMask,logoUv-vec2(texel.x,0.0)).a,
+          texture(uLogoMask,logoUv+vec2(0.0,texel.y)).a-texture(uLogoMask,logoUv-vec2(0.0,texel.y)).a
+        );
+        gradient.x /= uAspect;
+        float logoDistance = length(vec2((position.x-uLogoField.x)*uAspect,position.y-0.5));
+        velocity += gradient*(1.0-mask)*uLogoField.z*3.0*uDelta;
+        velocity += vec2((uLogoField.x-position.x)/uAspect,0.5-position.y)
+          *smoothstep(0.30,0.72,logoDistance)*uLogoField.z*uDelta;
       }
 
-      bool stream=aGroup<1.5;
-      if(stream&&phase>0.0){
-        vec2 dc=metric(uCore-p); float dist=length(dc); vec2 toward=dist>.001?dc/dist:vec2(1,0);
-        toward.x/=uAspect;
-        float local=smoothstep(.42,0.0,dist);
-        if(phase<1.0){ // approach: both continuous colour bands visibly converge
-          v += toward*(.48+phase*.78)*uEnergy*local*uDelta;
-        } else if(phase<2.0){ // narrow, slow, dense compression at the brand core
-          v += toward*2.7*uEnergy*local*uDelta;
-          v *= 1.0-local*(.12+.13*uEnergy);
-        } else if(phase<3.0){ // arrow-led release, tangential shear, small shock
-          vec2 normal=normalize(metric(p-uCore)+vec2(.0001)); normal.x/=uAspect;
-          float impact=1.0-(phase-2.0);
-          float mixed=step(fract(aSeed*37.17),mix(.18,.30,uEnergy));
-          v += vec2(2.15+.9*uEnergy,(aSeed-.5)*.58)*local*impact*mixed*uDelta;
-          v += vec2(-normal.y,normal.x)*sin(aSeed*49.0)*1.25*local*impact*uDelta;
-          v += normal*.38*local*impact*uDelta;
-        } else { // long mixed ribbon keeps travelling along the arrow
-          float mixed=step(fract(aSeed*37.17),mix(.18,.30,uEnergy));
-          float ribbonLife=1.0-smoothstep(3.0,4.0,phase);
-          v += vec2(.32, sin(aSeed*41.0)*.025)*mixed*ribbonLife*uDelta;
+      // Mouse is one continuous radial + tangential + dragged wake field.
+      if (uMouse.z > 0.5) {
+        vec2 mouseDelta = position - uMouse.xy;
+        mouseDelta.x *= uAspect;
+        float mouseDistance = length(mouseDelta);
+        float outer = smoothstep(uMouse.w, 0.0, mouseDistance);
+        float inner = smoothstep(uMouse.w*0.38, 0.0, mouseDistance);
+        vec2 direction = mouseDistance > 0.0001 ? mouseDelta/mouseDistance : vec2(1.0,0.0);
+        vec2 tangentForce = vec2(-direction.y,direction.x);
+        float speed = min(length(uMouseVelocity)*8.0,2.2);
+        velocity += direction * (outer*0.34 + inner*1.35) * uDelta;
+        velocity += tangentForce * outer * (0.42 + speed*0.45) * uDelta;
+        velocity += uMouseVelocity * outer * (0.95 + speed) * uDelta;
+      }
+
+      // Expanding click ring applies force only near the moving wave front.
+      if (uWave.z < uWave.w) {
+        vec2 waveDelta = position-uWave.xy;
+        waveDelta.x *= uAspect;
+        float waveDistance = length(waveDelta);
+        float waveProgress = uWave.z/uWave.w;
+        float waveRadius = waveProgress*0.58;
+        float ring = exp(-pow((waveDistance-waveRadius)/0.035,2.0));
+        vec2 waveDirection = waveDistance > 0.0001 ? waveDelta/waveDistance : vec2(1.0,0.0);
+        velocity += waveDirection*ring*(1.25-waveProgress*0.45)*uDelta;
+        velocity += vec2(-waveDirection.y,waveDirection.x)*ring*0.18*uDelta;
+      }
+
+      // The CPU selects two fields and a phase; this shader deforms every
+      // affected particle coherently: anticipation, compression, impact, wake.
+      bool selected = abs(aGroup-uCollisionGroups.x)<0.25 || abs(aGroup-uCollisionGroups.y)<0.25;
+      if (selected && uCollision.z > 0.0) {
+        vec2 contactDelta = position-uCollision.xy;
+        contactDelta.x *= uAspect;
+        float contactDistance = length(contactDelta);
+        vec2 normal = contactDistance > 0.0001 ? contactDelta/contactDistance : vec2(1.0,0.0);
+        vec2 tangentCollision = vec2(-normal.y,normal.x);
+        float influence = smoothstep(0.44,0.0,contactDistance);
+        float phase = uCollision.z;
+        if (phase < 1.0) {
+          velocity -= normal*influence*(0.4+phase*0.95)*uDelta;
+          velocity += tangentCollision*influence*phase*0.22*uDelta;
+        } else if (phase < 2.0) {
+          velocity -= normal*influence*1.42*uDelta;
+          velocity += tangentCollision*influence*sin(aSeed*31.0)*0.38*uDelta;
+        } else if (phase < 3.0) {
+          velocity += normal*influence*2.15*uDelta;
+          velocity += tangentCollision*influence*sin(aSeed*47.0)*1.15*uDelta;
+        } else {
+          float wake = (1.0-(phase-3.0))*influence;
+          velocity += tangentCollision*wake*(0.9+0.5*sin(aSeed*23.0))*uDelta;
+          velocity += curlField(position*5.0,aSeed+uTime)*wake*0.65*uDelta;
         }
       }
 
@@ -123,21 +256,32 @@
     layout(location=4) in float aKind; layout(location=5) in vec2 aHome;
     uniform float uAspect,uDpr,uPointMin,uPointMax,uPhase,uEnergy; uniform vec2 uCore; uniform vec3 uPalette[5];
     out vec4 vColour;
-    void main(){
-      gl_Position=vec4(aPosition.x*2.0-1.0,1.0-aPosition.y*2.0,0,1);
-      float distribution=fract(aSeed*17.731), kindSize=aKind<.5?.82:(aKind<1.5?1.05:.78);
-      float size=mix(uPointMin,uPointMax,pow(distribution,2.1))*kindSize;
-      float d=length(vec2((aPosition.x-uCore.x)*uAspect,aPosition.y-uCore.y));
-      float impact=(uPhase>=2.0&&uPhase<3.0)?1.0-(uPhase-2.0):0.0;
-      size*=1.0+smoothstep(.18,0.0,d)*impact*mix(.3,.8,uEnergy);
-      int group=int(aGroup+.5); vec3 colour=uPalette[group];
-      bool participant=aGroup<1.5; float mixed=step(fract(aSeed*37.17),mix(.18,.30,uEnergy));
-      float ribbon=uPhase>1.72 ? smoothstep(.24,0.0,abs(aPosition.y-uCore.y))*step(uCore.x-.04,aPosition.x) : 0.0;
-      float newColour=(participant?mixed:0.0)*max(smoothstep(.23,0.0,d),ribbon)*smoothstep(1.72,2.2,uPhase);
-      colour=mix(colour,uPalette[4],newColour);
-      if(aKind<.5) colour=mix(colour,vec3(.67,.57,.72),.28);
-      float alpha=aKind<.5?mix(.48,.78,distribution):mix(.30,.72,distribution);
-      alpha+=newColour*.18; gl_PointSize=size*uDpr*(1.0+newColour*.18); vColour=vec4(colour,alpha);
+
+    void main() {
+      vec2 clip = vec2(aPosition.x*2.0-1.0,1.0-aPosition.y*2.0);
+      gl_Position = vec4(clip,0.0,1.0);
+      float depth = fract(aSeed*17.731);
+      gl_PointSize = mix(uPointMin,uPointMax,pow(depth,3.1))*uDpr;
+      int groupIndex = int(aGroup+0.5);
+      vec3 colour = uPalette[groupIndex];
+      float alpha = mix(0.16,0.57,depth);
+
+      // Multiple perceptual interpolation positions create a colour ribbon,
+      // rather than replacing both colliding fields with one flat mixed hue.
+      bool selected = abs(aGroup-uCollisionGroups.x)<0.25 || abs(aGroup-uCollisionGroups.y)<0.25;
+      if (selected && uCollision.z>0.85) {
+        vec2 delta = aPosition-uCollision.xy;
+        delta.x *= uAspect;
+        float distanceToContact = length(delta);
+        float ribbon = smoothstep(0.27,0.015,distanceToContact);
+        float gradientPosition = clamp(0.5+delta.x*2.4+sin(delta.y*22.0+aSeed*9.0)*0.12,0.0,1.0);
+        vec3 firstColour = uPalette[int(uCollisionGroups.x+0.5)];
+        vec3 secondColour = uPalette[int(uCollisionGroups.y+0.5)];
+        vec3 transition = mix(firstColour,secondColour,smoothstep(0.0,1.0,gradientPosition));
+        colour = mix(colour,transition,ribbon*min(1.0,(uCollision.z-0.85)*2.4));
+        alpha += ribbon*0.16;
+      }
+      vColour = vec4(colour,alpha);
     }`;
   const RENDER_FRAGMENT = `#version 300 es
     precision mediump float; in vec4 vColour; out vec4 outColour;
@@ -145,48 +289,404 @@
   const BACKGROUND_VERTEX = `#version 300 es
     precision highp float; out vec2 vUv; void main(){ vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);vUv=p;gl_Position=vec4(p*2.0-1.0,0,1);}`;
   const BACKGROUND_FRAGMENT = `#version 300 es
-    precision highp float; in vec2 vUv; uniform float uTime,uAspect,uPhase,uEnergy; uniform vec2 uCore; uniform vec3 uPalette[5]; out vec4 outColour;
-    void main(){
-      vec3 c=mix(vec3(.055,.085,.205),vec3(.14,.075,.24),vUv.x*.62+vUv.y*.18);
-      vec2 q=vec2((vUv.x-uCore.x)*uAspect,vUv.y-uCore.y);
-      float logoFog=smoothstep(.48,.04,length(q))*0.07; c=mix(c,mix(uPalette[0],uPalette[1],vUv.y),logoFog);
-      // Fog follows particle impact by about 160 ms (the latter half of phase 2).
-      float delayed=smoothstep(2.50,2.82,uPhase)*(1.0-smoothstep(3.55,4.0,uPhase));
-      vec2 trail=q-vec2(max(q.x,0.0)*.34,0); float fog=smoothstep(.30,.0,length(trail))*delayed*(.18+.14*uEnergy);
-      c=mix(c,uPalette[4],fog); outColour=vec4(c,1);
+    precision highp float;
+    in vec2 vUv;
+    uniform float uTime;
+    uniform float uAspect;
+    uniform vec2 uCenters[5];
+    uniform vec3 uPalette[5];
+    uniform vec4 uCollision;
+    uniform vec2 uCollisionGroups;
+    out vec4 outColour;
+
+    void main() {
+      vec2 uv = vUv;
+      vec3 colour = mix(vec3(0.067,0.102,0.239),vec3(0.145,0.098,0.26),uv.x*0.64+uv.y*0.2);
+      for (int index=0;index<5;index++) {
+        vec2 delta = uv-uCenters[index];
+        delta.x *= uAspect;
+        float angle = float(index)*1.37+uTime*0.025;
+        mat2 rotation = mat2(cos(angle),-sin(angle),sin(angle),cos(angle));
+        delta = rotation*delta;
+        float warped = length(delta*vec2(0.72,1.28))+sin(delta.x*13.0+uTime*0.1)*0.012;
+        float fog = smoothstep(0.44,0.015,warped)*0.19;
+        colour = mix(colour,uPalette[index],fog);
+      }
+      if (uCollision.z>0.9) {
+        vec2 delta = uv-uCollision.xy;
+        delta.x *= uAspect;
+        float wake = smoothstep(0.32,0.0,length(delta+vec2(sin(delta.y*18.0+uTime)*0.025,0.0)));
+        vec3 mixed = mix(uPalette[int(uCollisionGroups.x+0.5)],uPalette[int(uCollisionGroups.y+0.5)],0.5+0.18*sin(delta.y*28.0));
+        colour = mix(colour,mixed,wake*0.2*min(1.0,uCollision.z-0.75));
+      }
+      outColour = vec4(colour,1.0);
     }`;
 
-  function shader(type, source) { const s=gl.createShader(type); gl.shaderSource(s,source); gl.compileShader(s); if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
-  function program(v,f,varyings){ const p=gl.createProgram(); gl.attachShader(p,shader(gl.VERTEX_SHADER,v)); gl.attachShader(p,shader(gl.FRAGMENT_SHADER,f)); if(varyings)gl.transformFeedbackVaryings(p,varyings,gl.SEPARATE_ATTRIBS); gl.linkProgram(p); if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p)); return p; }
-  function locations(p,names){ return names.reduce((o,n)=>(o[n]=gl.getUniformLocation(p,n),o),{}); }
-  function buffer(data,usage=gl.STATIC_DRAW){ const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,data,usage);return b; }
-  function initPrograms(){
-    updateProgram=program(UPDATE_VERTEX,PASS_FRAGMENT,['vPosition','vVelocity']); renderProgram=program(RENDER_VERTEX,RENDER_FRAGMENT); backgroundProgram=program(BACKGROUND_VERTEX,BACKGROUND_FRAGMENT);
-    updateU=locations(updateProgram,['uTime','uDelta','uAspect','uPhase','uEnergy','uCore','uMouse','uMouseVelocity']);
-    renderU=locations(renderProgram,['uAspect','uDpr','uPointMin','uPointMax','uPhase','uEnergy','uCore','uPalette[0]']);
-    backgroundU=locations(backgroundProgram,['uTime','uAspect','uPhase','uEnergy','uCore','uPalette[0]']); emptyVao=gl.createVertexArray();
+  function compileShader(type, source) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      const message = gl.getShaderInfoLog(shader);
+      gl.deleteShader(shader);
+      throw new Error(`Hero pigment shader failed: ${message}`);
+    }
+    return shader;
   }
-  function loadLogoMask(){
-    return new Promise((resolve,reject)=>{
-      const image=new Image();
-      image.onload=()=>{
-        const size=420, surface=document.createElement('canvas'); surface.width=size; surface.height=size;
-        const context=surface.getContext('2d',{willReadFrequently:true});
-        const scale=Math.min(size/image.naturalWidth,size/image.naturalHeight), drawWidth=image.naturalWidth*scale, drawHeight=image.naturalHeight*scale;
-        context.clearRect(0,0,size,size); context.drawImage(image,(size-drawWidth)/2,(size-drawHeight)/2,drawWidth,drawHeight);
-        const pixels=context.getImageData(0,0,size,size).data, inside=[], edge=[];
-        const opaque=(x,y)=>x>=0&&x<size&&y>=0&&y<size&&pixels[(y*size+x)*4+3]>48;
-        for(let y=1;y<size-1;y+=2)for(let x=1;x<size-1;x+=2){
-          if(!opaque(x,y))continue;
-          const point=[x/size,y/size]; inside.push(point);
-          if(!opaque(x-2,y)||!opaque(x+2,y)||!opaque(x,y-2)||!opaque(x,y+2))edge.push(point);
-        }
-        if(edge.length<40||inside.length<100)reject(new Error('Logo mask has insufficient opaque pixels'));
-        else resolve({inside,edge});
-      };
-      image.onerror=()=>reject(new Error(`Unable to load Hero logo mask: ${LOGO_MASK_URL}`));
-      image.src=LOGO_MASK_URL;
+
+  function createProgram(vertexSource, fragmentSource, varyings) {
+    const program = gl.createProgram();
+    gl.attachShader(program, compileShader(gl.VERTEX_SHADER, vertexSource));
+    gl.attachShader(program, compileShader(gl.FRAGMENT_SHADER, fragmentSource));
+    if (varyings) gl.transformFeedbackVaryings(program, varyings, gl.SEPARATE_ATTRIBS);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      const message = gl.getProgramInfoLog(program);
+      gl.deleteProgram(program);
+      throw new Error(`Hero pigment program failed: ${message}`);
+    }
+    return program;
+  }
+
+  function locations(program, names) {
+    return names.reduce((result, name) => {
+      result[name] = gl.getUniformLocation(program, name);
+      return result;
+    }, {});
+  }
+
+  function setPalette(uniform) {
+    gl.uniform3fv(uniform, new Float32Array(PALETTE.flat()));
+  }
+
+  function initializePrograms() {
+    updateProgram = createProgram(UPDATE_VERTEX, PASSTHROUGH_FRAGMENT, ['vPosition', 'vVelocity']);
+    renderProgram = createProgram(RENDER_VERTEX, RENDER_FRAGMENT);
+    backgroundProgram = createProgram(BACKGROUND_VERTEX, BACKGROUND_FRAGMENT);
+    updateUniforms = locations(updateProgram, [
+      'uTime','uDelta','uAspect','uFlowStrength','uClusterStrength','uDamping',
+      'uCenters[0]','uMouse','uMouseVelocity','uCollision','uCollisionGroups','uWave',
+      'uLogoMask','uLogoField'
+    ]);
+    renderUniforms = locations(renderProgram, [
+      'uAspect','uDpr','uPointMin','uPointMax','uPalette[0]','uCollision','uCollisionGroups'
+    ]);
+    backgroundUniforms = locations(backgroundProgram, [
+      'uTime','uAspect','uCenters[0]','uPalette[0]','uCollision','uCollisionGroups'
+    ]);
+    emptyVao = gl.createVertexArray();
+  }
+
+  function createBuffer(data, usage) {
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, data, usage);
+    return buffer;
+  }
+
+  function createLogoTexture() {
+    logoTexture = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D,logoTexture);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([0,0,0,0]));
+  }
+
+  function loadLogoMask() {
+    const image = new Image();
+    image.onload = () => {
+      const size = 420;
+      const surface = document.createElement('canvas');
+      surface.width = surface.height = size;
+      const context = surface.getContext('2d',{willReadFrequently:true});
+      const scale = Math.min(size/image.naturalWidth,size/image.naturalHeight);
+      const drawWidth = image.naturalWidth*scale;
+      const drawHeight = image.naturalHeight*scale;
+      context.drawImage(image,(size-drawWidth)/2,(size-drawHeight)/2,drawWidth,drawHeight);
+      const pixels = context.getImageData(0,0,size,size).data;
+      logoPoints = [];
+      for (let y=0;y<size;y+=2) for (let x=0;x<size;x+=2) {
+        if (pixels[(y*size+x)*4+3]>48) logoPoints.push([x/size,y/size]);
+      }
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D,logoTexture);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
+      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,surface);
+      // Re-seed the biased share once; the running engine never waits for the image.
+      if (logoPoints.length) initializeParticles();
+    };
+    image.onerror = () => console.warn(`Hero logo mask unavailable: ${LOGO_MASK_URL}`);
+    image.src = LOGO_MASK_URL;
+  }
+
+  function makeInitialState(count) {
+    const positions = new Float32Array(count * 2);
+    const velocities = new Float32Array(count * 2);
+    const seeds = new Float32Array(count);
+    const groups = new Float32Array(count);
+    for (let index=0;index<count;index+=1) {
+      const group = index % PIGMENT_CONFIG.clusterCount;
+      const band = Math.floor(index/PIGMENT_CONFIG.clusterCount) / Math.ceil(count/PIGMENT_CONFIG.clusterCount);
+      const angle = band*26.0 + group*1.7 + random(-0.28,0.28);
+      const ribbon = (band-0.5)*0.58;
+      const centerAngle = group/PIGMENT_CONFIG.clusterCount*Math.PI*2-Math.PI/2;
+      const centerX = 0.58+Math.cos(centerAngle)*0.265/aspect;
+      const centerY = 0.5+Math.sin(centerAngle)*0.27;
+      if (index<count*PIGMENT_CONFIG.logoParticleRatio && logoPoints.length) {
+        const point = logoPoints[Math.floor(Math.random()*logoPoints.length)];
+        positions[index*2] = (mobileQuery.matches ? 0.57 : 0.69)+(point[0]-0.5)*0.55/aspect+random(-0.008,0.008)/aspect;
+        positions[index*2+1] = 0.5+(point[1]-0.5)*0.55+random(-0.008,0.008);
+      } else {
+        positions[index*2] = centerX + Math.cos(angle)*random(0.015,0.17)/aspect + Math.cos(centerAngle)*ribbon*0.14;
+        positions[index*2+1] = centerY + Math.sin(angle)*random(0.012,0.105) + Math.sin(centerAngle)*ribbon*0.11;
+      }
+      velocities[index*2] = random(-0.025,0.025);
+      velocities[index*2+1] = random(-0.025,0.025);
+      seeds[index] = Math.random();
+      groups[index] = group;
+    }
+    return { positions, velocities, seeds, groups };
+  }
+
+  function createParticleSet(positionData, velocityData, seedBuffer, groupBuffer) {
+    const position = createBuffer(positionData, gl.DYNAMIC_COPY);
+    const velocity = createBuffer(velocityData, gl.DYNAMIC_COPY);
+    const vao = gl.createVertexArray();
+    gl.bindVertexArray(vao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, position);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, velocity);
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1,2,gl.FLOAT,false,0,0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, seedBuffer);
+    gl.enableVertexAttribArray(2);
+    gl.vertexAttribPointer(2,1,gl.FLOAT,false,0,0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, groupBuffer);
+    gl.enableVertexAttribArray(3);
+    gl.vertexAttribPointer(3,1,gl.FLOAT,false,0,0);
+    return { position, velocity, vao };
+  }
+
+  function destroyParticleSets() {
+    if (particleSets[0]) {
+      gl.deleteBuffer(particleSets[0].seed);
+      gl.deleteBuffer(particleSets[0].group);
+    }
+    particleSets.forEach((set) => {
+      gl.deleteBuffer(set.position);
+      gl.deleteBuffer(set.velocity);
+      gl.deleteVertexArray(set.vao);
     });
+    particleSets = [];
+  }
+
+  function initializeParticles() {
+    destroyParticleSets();
+    particleCount = reducedQuery.matches
+      ? PIGMENT_CONFIG.reducedMotionCount
+      : (mobileQuery.matches ? PIGMENT_CONFIG.mobileCount : PIGMENT_CONFIG.desktopCount);
+    const state = makeInitialState(particleCount);
+    const seedBuffer = createBuffer(state.seeds, gl.STATIC_DRAW);
+    const groupBuffer = createBuffer(state.groups, gl.STATIC_DRAW);
+    particleSets = [
+      createParticleSet(state.positions,state.velocities,seedBuffer,groupBuffer),
+      createParticleSet(state.positions,state.velocities,seedBuffer,groupBuffer)
+    ];
+    // VAOs retain these buffers; mark ownership on the first set for cleanup.
+    particleSets[0].seed = seedBuffer;
+    particleSets[0].group = groupBuffer;
+    sourceIndex = 0;
+  }
+
+  function resize() {
+    const rect = hero.getBoundingClientRect();
+    width = Math.max(1,rect.width);
+    height = Math.max(1,rect.height);
+    aspect = width/height;
+    dpr = Math.min(window.devicePixelRatio||1,mobileQuery.matches ? PIGMENT_CONFIG.mobileDprCap : PIGMENT_CONFIG.desktopDprCap);
+    canvas.width = Math.round(width*dpr);
+    canvas.height = Math.round(height*dpr);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    gl.viewport(0,0,canvas.width,canvas.height);
+    initializeParticles();
+  }
+
+  function clusterCenters(time) {
+    const data = new Float32Array(10);
+    for (let index=0;index<5;index+=1) {
+      const angle = index/5*Math.PI*2-Math.PI/2;
+      const pulse = 1+Math.sin(time*0.13+index*1.71)*0.13;
+      data[index*2] = 0.58+Math.cos(angle)*0.265*pulse/aspect+Math.sin(time*0.08+index)*0.025;
+      data[index*2+1] = 0.5+Math.sin(angle)*0.27*pulse+Math.cos(time*0.065+index*1.4)*0.032;
+    }
+    return data;
+  }
+
+  function updateCollision(delta) {
+    fieldCollision.next -= delta;
+    if (!fieldCollision.active && fieldCollision.next<=0 && !reducedQuery.matches) {
+      fieldCollision.first = Math.floor(Math.random()*5);
+      fieldCollision.second = (fieldCollision.first+1+Math.floor(Math.random()*4))%5;
+      fieldCollision.age = 0;
+      fieldCollision.active = true;
+    }
+    if (!fieldCollision.active) return 0;
+    fieldCollision.age += delta;
+    const approach = PIGMENT_CONFIG.approachDuration;
+    const compression = approach+PIGMENT_CONFIG.compressionDuration;
+    const impact = compression+PIGMENT_CONFIG.impactDuration;
+    const total = impact+PIGMENT_CONFIG.wakeDuration;
+    if (fieldCollision.age<approach) return fieldCollision.age/approach;
+    if (fieldCollision.age<compression) return 1+(fieldCollision.age-approach)/PIGMENT_CONFIG.compressionDuration;
+    if (fieldCollision.age<impact) return 2+(fieldCollision.age-compression)/PIGMENT_CONFIG.impactDuration;
+    if (fieldCollision.age<total) return 3+(fieldCollision.age-impact)/PIGMENT_CONFIG.wakeDuration;
+    fieldCollision.active = false;
+    fieldCollision.next = random(PIGMENT_CONFIG.collisionIntervalMin,PIGMENT_CONFIG.collisionIntervalMax);
+    return 0;
+  }
+
+  function collisionPoint(centers) {
+    const a = fieldCollision.first*2;
+    const b = fieldCollision.second*2;
+    return [(centers[a]+centers[b])*0.5,(centers[a+1]+centers[b+1])*0.5];
+  }
+
+  function setInteractionUniforms(uniforms, centers, collisionPhase) {
+    const contact = collisionPoint(centers);
+    gl.uniform1f(uniforms.uAspect,aspect);
+    if (uniforms['uCenters[0]']) gl.uniform2fv(uniforms['uCenters[0]'],centers);
+    if (uniforms.uCollision) gl.uniform4f(uniforms.uCollision,contact[0],contact[1],collisionPhase,PIGMENT_CONFIG.collisionRadius);
+    if (uniforms.uCollisionGroups) gl.uniform2f(uniforms.uCollisionGroups,fieldCollision.first,fieldCollision.second);
+  }
+
+  function updateParticles(delta, centers, collisionPhase) {
+    const source = particleSets[sourceIndex];
+    const target = particleSets[1-sourceIndex];
+    gl.useProgram(updateProgram);
+    gl.bindVertexArray(source.vao);
+    gl.uniform1f(updateUniforms.uTime,elapsed);
+    gl.uniform1f(updateUniforms.uDelta,delta);
+    gl.uniform1f(updateUniforms.uFlowStrength,reducedQuery.matches ? 0.055 : (mobileQuery.matches ? 0.25 : PIGMENT_CONFIG.flowStrength));
+    gl.uniform1f(updateUniforms.uClusterStrength,PIGMENT_CONFIG.clusterStrength);
+    gl.uniform1f(updateUniforms.uDamping,PIGMENT_CONFIG.damping);
+    gl.uniform4f(updateUniforms.uMouse,pointer.x,pointer.y,pointer.active,PIGMENT_CONFIG.mouseOuterRadius);
+    gl.uniform2f(updateUniforms.uMouseVelocity,pointer.vx,pointer.vy);
+    gl.uniform4f(updateUniforms.uWave,resonance.x,resonance.y,resonance.age,PIGMENT_CONFIG.resonanceDuration);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D,logoTexture);
+    gl.uniform1i(updateUniforms.uLogoMask,0);
+    gl.uniform3f(updateUniforms.uLogoField,mobileQuery.matches ? 0.57 : 0.69,0.55,PIGMENT_CONFIG.logoAttractionStrength);
+    setInteractionUniforms(updateUniforms,centers,collisionPhase);
+    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,0,target.position);
+    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,1,target.velocity);
+    gl.enable(gl.RASTERIZER_DISCARD);
+    gl.beginTransformFeedback(gl.POINTS);
+    gl.drawArrays(gl.POINTS,0,particleCount);
+    gl.endTransformFeedback();
+    gl.disable(gl.RASTERIZER_DISCARD);
+    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,0,null);
+    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,1,null);
+    sourceIndex = 1-sourceIndex;
+  }
+
+  function drawBackground(centers, collisionPhase) {
+    gl.disable(gl.BLEND);
+    gl.useProgram(backgroundProgram);
+    gl.bindVertexArray(emptyVao);
+    gl.uniform1f(backgroundUniforms.uTime,elapsed);
+    setPalette(backgroundUniforms['uPalette[0]']);
+    setInteractionUniforms(backgroundUniforms,centers,collisionPhase);
+    gl.drawArrays(gl.TRIANGLES,0,3);
+  }
+
+  function drawParticles(centers, collisionPhase) {
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+    gl.useProgram(renderProgram);
+    gl.bindVertexArray(particleSets[sourceIndex].vao);
+    gl.uniform1f(renderUniforms.uDpr,dpr);
+    gl.uniform1f(renderUniforms.uPointMin,PIGMENT_CONFIG.pointSizeMin);
+    gl.uniform1f(renderUniforms.uPointMax,PIGMENT_CONFIG.pointSizeMax);
+    setPalette(renderUniforms['uPalette[0]']);
+    setInteractionUniforms(renderUniforms,centers,collisionPhase);
+    gl.drawArrays(gl.POINTS,0,particleCount);
+  }
+
+  function animate(time) {
+    if (!visible) return;
+    const rawDelta = Math.min(0.033,(time-lastTime)/1000||0.0167);
+    const delta = reducedQuery.matches ? rawDelta*0.16 : rawDelta;
+    lastTime = time;
+    elapsed += delta;
+    resonance.age += rawDelta;
+    const collisionPhase = updateCollision(rawDelta);
+    const centers = clusterCenters(elapsed);
+    updateParticles(delta,centers,collisionPhase);
+    drawBackground(centers,collisionPhase);
+    drawParticles(centers,collisionPhase);
+    pointer.vx *= 0.82;
+    pointer.vy *= 0.82;
+    animationFrame = requestAnimationFrame(animate);
+  }
+
+  function pointerPosition(event) {
+    const rect = hero.getBoundingClientRect();
+    return [(event.clientX-rect.left)/rect.width,(event.clientY-rect.top)/rect.height];
+  }
+
+  hero.addEventListener('pointerenter',(event) => {
+    if (event.pointerType==='touch') return;
+    const position = pointerPosition(event);
+    pointer.x = pointer.previousX = position[0];
+    pointer.y = pointer.previousY = position[1];
+    pointer.active = 1;
+  },{passive:true});
+  hero.addEventListener('pointermove',(event) => {
+    if (event.pointerType==='touch') return;
+    const position = pointerPosition(event);
+    pointer.vx = clamp(position[0]-pointer.previousX,-0.08,0.08);
+    pointer.vy = clamp(position[1]-pointer.previousY,-0.08,0.08);
+    pointer.x = pointer.previousX = position[0];
+    pointer.y = pointer.previousY = position[1];
+    pointer.active = 1;
+  },{passive:true});
+  hero.addEventListener('pointerleave',() => { pointer.active = 0; },{passive:true});
+  hero.addEventListener('pointerdown',(event) => {
+    if (reducedQuery.matches) return;
+    const position = pointerPosition(event);
+    resonance.x = position[0];
+    resonance.y = position[1];
+    resonance.age = 0;
+  },{passive:true});
+  document.addEventListener('visibilitychange',() => {
+    visible = !document.hidden;
+    cancelAnimationFrame(animationFrame);
+    if (visible) {
+      lastTime = performance.now();
+      animationFrame = requestAnimationFrame(animate);
+    }
+  });
+  window.addEventListener('resize',resize,{passive:true});
+  if (mobileQuery.addEventListener) {
+    mobileQuery.addEventListener('change',resize);
+    reducedQuery.addEventListener('change',resize);
+  }
+
+  try {
+    initializePrograms();
+    createLogoTexture();
+    resize();
+    animationFrame = requestAnimationFrame(animate);
+    loadLogoMask();
+  } catch (error) {
+    canvas.remove();
+    hero.classList.add('hero-pigment-fallback');
+    console.error(error);
   }
   function logoGeometry(kind){
     const collection=kind===0?logoMask.edge:logoMask.inside;
