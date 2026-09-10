@@ -4,11 +4,11 @@
   'use strict';
 
   const CONFIG = {
-    desktopCount: 30000, mobileCount: 12000, reducedMotionCount: 3600,
-    skeletonRatio: 0.50, flowRatio: 0.36, freeRatio: 0.14,
-    pointSizeMin: 1.45, pointSizeMax: 7.6,
-    approachDuration: 1.32, compressionDuration: 0.48, impactDuration: 0.38,
-    ribbonDuration: 4.6, reformDuration: 4.6,
+    desktopCount: 20000, mobileCount: 8000, reducedMotionCount: 2800,
+    skeletonRatio: 0.42, flowRatio: 0.30, freeRatio: 0.28,
+    pointSizeMin: 1.35, pointSizeMax: 6.8,
+    approachDuration: 1.18, compressionDuration: 0.42, impactDuration: 0.32,
+    ribbonDuration: 3.6, reformDuration: 4.2,
     collisionIntervalMin: 4.8, collisionIntervalMax: 7.4,
     collisionRadius: 0.145, desktopDprCap: 1.65, mobileDprCap: 1.25
   };
@@ -16,7 +16,7 @@
     [0.12, 0.72, 0.78], [0.88, 0.24, 0.56], [0.96, 0.70, 0.18],
     [0.96, 0.40, 0.17], [0.57, 0.25, 0.92]
   ];
-  const LOGO_MASK_URL = 'images/chiahe-logo-symbol.png';
+  const LOGO_MASK_URL = 'chiahe_logo_transparent.png';
   window.HERO_PIGMENT_CONFIG = CONFIG;
   window.HERO_PIGMENT_PALETTE = PALETTE;
 
@@ -60,21 +60,20 @@
       bool skeleton=aKind<.5, internal=aKind>.5&&aKind<1.5;
       float reform=phase>3.0 ? smoothstep(3.0,4.0,phase) : 0.0;
 
-      // Half of all particles remain a legible, breathing outline.
+      // Forty-two percent of particles remain a legible, breathing outline.
       if(skeleton){
-        float breath=.93+.07*sin(uTime*1.15+aSeed*9.0);
-        v += toHome*(3.7+reform*2.8)*uDelta;
-        v += curl(p*2.0,aSeed)*(.026+.012*breath)*uDelta;
+        v += toHome*(2.9+reform*2.4)*uDelta;
+        v += curl(p*2.0,aSeed)*.018*uDelta;
         v *= pow(.91,uDelta*60.0);
       } else if(internal){
-        v += toHome*(1.12+reform*1.8)*uDelta;
-        vec2 orbit=metric(p-uCore); vec2 tangent=normalize(vec2(-orbit.y,orbit.x)+vec2(.001)); tangent.x/=uAspect;
-        if(aGroup>1.5)tangent=normalize(vec2(1.0,.12*sin(aSeed*19.0+uTime)));
-        v += tangent*(.19+.09*sin(aSeed*31.0+uTime*1.3))*uDelta;
-        v += curl(p*2.8,aSeed)*.085*uDelta;
+        v += toHome*(.88+reform*1.5)*uDelta;
+        vec2 tangent = aGroup<.5 ? normalize(vec2(-toHome.y,toHome.x)) :
+                       aGroup<1.5 ? normalize(vec2(toHome.y,-toHome.x)) : vec2(1.0,0.0);
+        v += tangent*(.11+.05*sin(aSeed*31.0+uTime))*uDelta;
+        v += curl(p*2.6,aSeed)*.055*uDelta;
       } else {
         v += toHome*(.20+reform*.75)*uDelta;
-        v += curl(p*2.1,aSeed)*.105*uDelta;
+        v += curl(p*2.1,aSeed)*.075*uDelta;
       }
 
       bool stream=aGroup<1.5;
@@ -83,21 +82,21 @@
         toward.x/=uAspect;
         float local=smoothstep(.42,0.0,dist);
         if(phase<1.0){ // approach: both continuous colour bands visibly converge
-          v += toward*(.68+phase*1.05)*uEnergy*local*uDelta;
+          v += toward*(.48+phase*.78)*uEnergy*local*uDelta;
         } else if(phase<2.0){ // narrow, slow, dense compression at the brand core
-          v += toward*3.65*uEnergy*local*uDelta;
-          v *= 1.0-local*(.17+.16*uEnergy);
+          v += toward*2.7*uEnergy*local*uDelta;
+          v *= 1.0-local*(.12+.13*uEnergy);
         } else if(phase<3.0){ // arrow-led release, tangential shear, small shock
           vec2 normal=normalize(metric(p-uCore)+vec2(.0001)); normal.x/=uAspect;
           float impact=1.0-(phase-2.0);
-          float mixed=step(fract(aSeed*37.17),mix(.27,.44,uEnergy));
-          v += vec2(2.85+1.25*uEnergy,(aSeed-.5)*.72)*local*impact*mixed*uDelta;
-          v += vec2(-normal.y,normal.x)*sin(aSeed*49.0)*1.65*local*impact*uDelta;
-          v += normal*.52*local*impact*uDelta;
+          float mixed=step(fract(aSeed*37.17),mix(.18,.30,uEnergy));
+          v += vec2(2.15+.9*uEnergy,(aSeed-.5)*.58)*local*impact*mixed*uDelta;
+          v += vec2(-normal.y,normal.x)*sin(aSeed*49.0)*1.25*local*impact*uDelta;
+          v += normal*.38*local*impact*uDelta;
         } else { // long mixed ribbon keeps travelling along the arrow
-          float mixed=step(fract(aSeed*37.17),mix(.27,.44,uEnergy));
+          float mixed=step(fract(aSeed*37.17),mix(.18,.30,uEnergy));
           float ribbonLife=1.0-smoothstep(3.0,4.0,phase);
-          v += vec2(.46, sin(aSeed*41.0)*.04)*mixed*ribbonLife*uDelta;
+          v += vec2(.32, sin(aSeed*41.0)*.025)*mixed*ribbonLife*uDelta;
         }
       }
 
@@ -105,14 +104,11 @@
       if(uMouse.z>.5){
         vec2 dm=metric(uMouse.xy-p); float md=length(dm); vec2 towardMouse=md>.001?dm/md:vec2(0); towardMouse.x/=uAspect;
         float reach=smoothstep(uMouse.w,0.0,md);
-        vec2 mouseTangent=vec2(-towardMouse.y,towardMouse.x);
-        float mouseSpeed=min(length(metric(uMouseVelocity))*12.0,1.0);
-        v += towardMouse*reach*(.52+.34*mouseSpeed)*uDelta;
-        v += mouseTangent*reach*(.30+.58*mouseSpeed)*sin(aSeed*17.0)*uDelta;
+        v += towardMouse*reach*.34*uDelta;
         vec2 dc=metric(uCore-p); float cd=length(dc); vec2 towardCore=cd>.001?dc/cd:vec2(0); towardCore.x/=uAspect;
         float logoMouse=smoothstep(.34,0.0,length(metric(uMouse.xy-uCore)));
-        v += towardCore*reach*logoMouse*.78*uDelta;
-        v += uMouseVelocity*reach*(.66+mouseSpeed)*uDelta;
+        v += towardCore*reach*logoMouse*.48*uDelta;
+        v += uMouseVelocity*reach*.42*uDelta;
       }
       v*=pow(skeleton?.986:.991,uDelta*60.0); v=clamp(v,vec2(-1.7),vec2(1.7)); p+=v*uDelta;
       if(p.x<-.08||p.x>1.13||p.y<-.1||p.y>1.1){ p=mix(p,aHome,.065); v*=.65; }
@@ -129,24 +125,23 @@
     out vec4 vColour;
     void main(){
       gl_Position=vec4(aPosition.x*2.0-1.0,1.0-aPosition.y*2.0,0,1);
-      float distribution=fract(aSeed*17.731), depth=fract(aSeed*53.73), kindSize=aKind<.5?.88:(aKind<1.5?1.08:.74);
+      float distribution=fract(aSeed*17.731), kindSize=aKind<.5?.82:(aKind<1.5?1.05:.78);
       float size=mix(uPointMin,uPointMax,pow(distribution,2.1))*kindSize;
       float d=length(vec2((aPosition.x-uCore.x)*uAspect,aPosition.y-uCore.y));
       float impact=(uPhase>=2.0&&uPhase<3.0)?1.0-(uPhase-2.0):0.0;
-      size*=mix(.70,1.24,depth)*(1.0+smoothstep(.19,0.0,d)*impact*mix(.48,1.0,uEnergy));
+      size*=1.0+smoothstep(.18,0.0,d)*impact*mix(.3,.8,uEnergy);
       int group=int(aGroup+.5); vec3 colour=uPalette[group];
-      bool participant=aGroup<1.5; float mixed=step(fract(aSeed*37.17),mix(.27,.44,uEnergy));
-      float ribbon=uPhase>1.72 ? smoothstep(.28,0.0,abs(aPosition.y-uCore.y))*step(uCore.x-.04,aPosition.x) : 0.0;
+      bool participant=aGroup<1.5; float mixed=step(fract(aSeed*37.17),mix(.18,.30,uEnergy));
+      float ribbon=uPhase>1.72 ? smoothstep(.24,0.0,abs(aPosition.y-uCore.y))*step(uCore.x-.04,aPosition.x) : 0.0;
       float newColour=(participant?mixed:0.0)*max(smoothstep(.23,0.0,d),ribbon)*smoothstep(1.72,2.2,uPhase);
       colour=mix(colour,uPalette[4],newColour);
       if(aKind<.5) colour=mix(colour,vec3(.67,.57,.72),.28);
-      float alpha=aKind<.5?mix(.58,.88,distribution):mix(.34,.78,distribution);
-      alpha*=mix(.55,1.0,depth); alpha+=newColour*.24+impact*smoothstep(.2,0.0,d)*.14;
-      gl_PointSize=size*uDpr*(1.0+newColour*.28); vColour=vec4(colour,alpha);
+      float alpha=aKind<.5?mix(.48,.78,distribution):mix(.30,.72,distribution);
+      alpha+=newColour*.18; gl_PointSize=size*uDpr*(1.0+newColour*.18); vColour=vec4(colour,alpha);
     }`;
   const RENDER_FRAGMENT = `#version 300 es
     precision mediump float; in vec4 vColour; out vec4 outColour;
-    void main(){ vec2 q=gl_PointCoord*2.0-1.0; float r=dot(q,q); if(r>1.0)discard; float halo=smoothstep(1.0,.02,r); float core=smoothstep(.26,0.0,r); outColour=vec4(vColour.rgb*(1.0+core*.20),vColour.a*(halo*.66+core*.34)); }`;
+    void main(){ vec2 q=gl_PointCoord*2.0-1.0; float r=dot(q,q); if(r>1.0)discard; outColour=vec4(vColour.rgb,vColour.a*smoothstep(1.0,.08,r)); }`;
   const BACKGROUND_VERTEX = `#version 300 es
     precision highp float; out vec2 vUv; void main(){ vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);vUv=p;gl_Position=vec4(p*2.0-1.0,0,1);}`;
   const BACKGROUND_FRAGMENT = `#version 300 es
@@ -154,19 +149,11 @@
     void main(){
       vec3 c=mix(vec3(.055,.085,.205),vec3(.14,.075,.24),vUv.x*.62+vUv.y*.18);
       vec2 q=vec2((vUv.x-uCore.x)*uAspect,vUv.y-uCore.y);
-      float breathing=.5+.5*sin(uTime*.34);
-      float cloudA=smoothstep(.48,.025,length(q+vec2(.055*sin(uTime*.12),-.045*cos(uTime*.16))));
-      float cloudB=smoothstep(.34,.015,length(q*vec2(.72,1.18)-vec2(.09,-.08)));
-      float filaments=.5+.5*sin(q.x*19.0-q.y*14.0+uTime*.28);
-      float logoFog=cloudA*(.075+.025*breathing)+cloudB*.045+cloudA*filaments*.025;
-      c=mix(c,mix(uPalette[0],uPalette[1],smoothstep(-.24,.24,q.y)),logoFog);
-      float warmHaze=smoothstep(.31,.0,length(q-vec2(-.10,.13)))*(.025+.018*sin(uTime*.23+1.2));
-      c=mix(c,uPalette[2],warmHaze);
+      float logoFog=smoothstep(.48,.04,length(q))*0.07; c=mix(c,mix(uPalette[0],uPalette[1],vUv.y),logoFog);
       // Fog follows particle impact by about 160 ms (the latter half of phase 2).
       float delayed=smoothstep(2.50,2.82,uPhase)*(1.0-smoothstep(3.55,4.0,uPhase));
-      vec2 trail=q-vec2(max(q.x,0.0)*.34,0); float fog=smoothstep(.34,.0,length(trail))*delayed*(.25+.18*uEnergy);
-      float coreGlow=smoothstep(.16,.0,length(q))*smoothstep(1.45,2.15,uPhase)*(1.0-smoothstep(3.2,3.8,uPhase));
-      c=mix(c,uPalette[4],fog); c+=uPalette[4]*coreGlow*(.08+.11*uEnergy); outColour=vec4(c,1);
+      vec2 trail=q-vec2(max(q.x,0.0)*.34,0); float fog=smoothstep(.30,.0,length(trail))*delayed*(.18+.14*uEnergy);
+      c=mix(c,uPalette[4],fog); outColour=vec4(c,1);
     }`;
 
   function shader(type, source) { const s=gl.createShader(type); gl.shaderSource(s,source); gl.compileShader(s); if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
@@ -246,191 +233,9 @@
     gl.uniform1f(updateU.uTime,elapsed);gl.uniform1f(updateU.uDelta,dt);gl.uniform4f(updateU.uMouse,pointer.x,pointer.y,pointer.active,.265);gl.uniform2f(updateU.uMouseVelocity,pointer.vx,pointer.vy);
     gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,0,b.position);gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,1,b.velocity);gl.enable(gl.RASTERIZER_DISCARD);gl.beginTransformFeedback(gl.POINTS);gl.drawArrays(gl.POINTS,0,count);gl.endTransformFeedback();gl.disable(gl.RASTERIZER_DISCARD);gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,0,null);gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,1,null);source=1-source;
   }
-
-  function updateCollision(delta) {
-    fieldCollision.next -= delta;
-    if (!fieldCollision.active && fieldCollision.next<=0 && !reducedQuery.matches) {
-      fieldCollision.first = Math.floor(Math.random()*5);
-      fieldCollision.second = (fieldCollision.first+1+Math.floor(Math.random()*4))%5;
-      fieldCollision.age = 0;
-      fieldCollision.active = true;
-    }
-    if (!fieldCollision.active) return 0;
-    fieldCollision.age += delta;
-    const approach = PIGMENT_CONFIG.approachDuration;
-    const compression = approach+PIGMENT_CONFIG.compressionDuration;
-    const impact = compression+PIGMENT_CONFIG.impactDuration;
-    const total = impact+PIGMENT_CONFIG.wakeDuration;
-    if (fieldCollision.age<approach) return fieldCollision.age/approach;
-    if (fieldCollision.age<compression) return 1+(fieldCollision.age-approach)/PIGMENT_CONFIG.compressionDuration;
-    if (fieldCollision.age<impact) return 2+(fieldCollision.age-compression)/PIGMENT_CONFIG.impactDuration;
-    if (fieldCollision.age<total) return 3+(fieldCollision.age-impact)/PIGMENT_CONFIG.wakeDuration;
-    fieldCollision.active = false;
-    fieldCollision.next = random(PIGMENT_CONFIG.collisionIntervalMin,PIGMENT_CONFIG.collisionIntervalMax);
-    return 0;
-  }
-
-  function collisionPoint(centers) {
-    const a = fieldCollision.first*2;
-    const b = fieldCollision.second*2;
-    return [(centers[a]+centers[b])*0.5,(centers[a+1]+centers[b+1])*0.5];
-  }
-
-  function setInteractionUniforms(uniforms, centers, collisionPhase) {
-    const contact = collisionPoint(centers);
-    gl.uniform1f(uniforms.uAspect,aspect);
-    if (uniforms['uCenters[0]']) gl.uniform2fv(uniforms['uCenters[0]'],centers);
-    if (uniforms.uCollision) gl.uniform4f(uniforms.uCollision,contact[0],contact[1],collisionPhase,PIGMENT_CONFIG.collisionRadius);
-    if (uniforms.uCollisionGroups) gl.uniform2f(uniforms.uCollisionGroups,fieldCollision.first,fieldCollision.second);
-  }
-
-  function updateParticles(delta, centers, collisionPhase) {
-    const source = particleSets[sourceIndex];
-    const target = particleSets[1-sourceIndex];
-    if (source.position===target.position || source.velocity===target.velocity) {
-      throw new Error('Hero pigment transform-feedback buffers are aliased');
-    }
-    gl.useProgram(updateProgram);
-    gl.bindVertexArray(source.vao);
-    gl.uniform1f(updateUniforms.uTime,elapsed);
-    gl.uniform1f(updateUniforms.uDelta,delta);
-    gl.uniform1f(updateUniforms.uFlowStrength,reducedQuery.matches ? 0.055 : (mobileQuery.matches ? 0.25 : PIGMENT_CONFIG.flowStrength));
-    gl.uniform1f(updateUniforms.uClusterStrength,PIGMENT_CONFIG.clusterStrength);
-    gl.uniform1f(updateUniforms.uDamping,PIGMENT_CONFIG.damping);
-    gl.uniform4f(updateUniforms.uMouse,pointer.x,pointer.y,pointer.active,PIGMENT_CONFIG.mouseOuterRadius);
-    gl.uniform2f(updateUniforms.uMouseVelocity,pointer.vx,pointer.vy);
-    gl.uniform4f(updateUniforms.uMouseForces,PIGMENT_CONFIG.mouseRadialForce,PIGMENT_CONFIG.mouseSwirlForce,PIGMENT_CONFIG.mouseWakeForce,PIGMENT_CONFIG.mouseAttractionForce);
-    gl.uniform4f(updateUniforms.uWave,resonance.x,resonance.y,resonance.age,PIGMENT_CONFIG.resonanceDuration);
-    gl.uniform1f(updateUniforms.uDebugMotion,GPU_SANITY_MOTION ? 1 : 0);
-    setInteractionUniforms(updateUniforms,centers,collisionPhase);
-    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,0,target.position);
-    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,1,target.velocity);
-    debugGlError('bindBufferBase');
-    gl.enable(gl.RASTERIZER_DISCARD);
-    gl.beginTransformFeedback(gl.POINTS);
-    debugGlError('beginTransformFeedback');
-    gl.drawArrays(gl.POINTS,0,particleCount);
-    debugGlError('drawArrays');
-    gl.endTransformFeedback();
-    debugGlError('endTransformFeedback');
-    gl.disable(gl.RASTERIZER_DISCARD);
-    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,0,null);
-    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,1,null);
-    sourceIndex = 1-sourceIndex;
-    debugReadback();
-  }
-
-  function drawBackground(centers, collisionPhase) {
-    gl.disable(gl.BLEND);
-    gl.useProgram(backgroundProgram);
-    gl.bindVertexArray(emptyVao);
-    gl.uniform1f(backgroundUniforms.uTime,elapsed);
-    setPalette(backgroundUniforms['uPalette[0]']);
-    setInteractionUniforms(backgroundUniforms,centers,collisionPhase);
-    gl.drawArrays(gl.TRIANGLES,0,3);
-  }
-
-  function drawParticles(centers, collisionPhase) {
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
-    gl.useProgram(renderProgram);
-    gl.bindVertexArray(particleSets[sourceIndex].vao);
-    gl.uniform1f(renderUniforms.uDpr,dpr);
-    gl.uniform1f(renderUniforms.uPointMin,PIGMENT_CONFIG.pointSizeMin);
-    gl.uniform1f(renderUniforms.uPointMax,PIGMENT_CONFIG.pointSizeMax);
-    setPalette(renderUniforms['uPalette[0]']);
-    setInteractionUniforms(renderUniforms,centers,collisionPhase);
-    gl.drawArrays(gl.POINTS,0,particleCount);
-    debugGlError('render draw');
-  }
-
-  function animate(time) {
-    if (!visible) return;
-    const rawDelta = Math.min(0.033,(time-lastTime)/1000||0.0167);
-    const delta = reducedQuery.matches ? rawDelta*0.16 : rawDelta;
-    lastTime = time;
-    elapsed += delta;
-    frameCount += 1;
-    resonance.age += rawDelta;
-    const collisionPhase = updateCollision(rawDelta);
-    currentCenters = clusterCenters(elapsed);
-    updateParticles(delta,currentCenters,collisionPhase);
-    drawBackground(currentCenters,collisionPhase);
-    drawParticles(currentCenters,collisionPhase);
-    pointer.vx *= 0.82;
-    pointer.vy *= 0.82;
-    if (DEBUG_GPU_MOTION && frameCount%120===0) {
-      console.debug('Hero pigment animation frame', { frame: frameCount, elapsed, delta, sourceIndex });
-    }
-    animationFrame = requestAnimationFrame(animate);
-  }
-
-  function pointerPosition(event) {
-    const rect = hero.getBoundingClientRect();
-    return [(event.clientX-rect.left)/rect.width,(event.clientY-rect.top)/rect.height];
-  }
-
-  hero.addEventListener('pointerenter',(event) => {
-    if (event.pointerType==='touch') return;
-    const position = pointerPosition(event);
-    pointer.x = pointer.previousX = position[0];
-    pointer.y = pointer.previousY = position[1];
-    pointer.active = 1;
-  },{passive:true});
-  hero.addEventListener('pointermove',(event) => {
-    if (event.pointerType==='touch') return;
-    const position = pointerPosition(event);
-    pointer.vx = clamp(position[0]-pointer.previousX,-0.08,0.08);
-    pointer.vy = clamp(position[1]-pointer.previousY,-0.08,0.08);
-    pointer.x = pointer.previousX = position[0];
-    pointer.y = pointer.previousY = position[1];
-    pointer.active = 1;
-  },{passive:true});
-  hero.addEventListener('pointerleave',() => { pointer.active = 0; },{passive:true});
-  hero.addEventListener('pointerdown',(event) => {
-    if (reducedQuery.matches) return;
-    const position = pointerPosition(event);
-    resonance.x = position[0];
-    resonance.y = position[1];
-    resonance.age = 0;
-  },{passive:true});
-  canvas.addEventListener('webglcontextlost',(event) => {
-    event.preventDefault();
-    visible = false;
-    cancelAnimationFrame(animationFrame);
-    console.warn('Hero pigment WebGL context lost');
-  });
-  canvas.addEventListener('webglcontextrestored',() => {
-    console.info('Hero pigment WebGL context restored');
-    particleSets = [];
-    initializePrograms();
-    resize();
-    visible = !document.hidden;
-    lastTime = performance.now();
-    if (visible) animationFrame = requestAnimationFrame(animate);
-  });
-  document.addEventListener('visibilitychange',() => {
-    visible = !document.hidden;
-    cancelAnimationFrame(animationFrame);
-    if (visible) {
-      lastTime = performance.now();
-      animationFrame = requestAnimationFrame(animate);
-    }
-  });
-  window.addEventListener('resize',resize,{passive:true});
-  if (mobileQuery.addEventListener) {
-    mobileQuery.addEventListener('change',resize);
-    reducedQuery.addEventListener('change',resize);
-  }
-
-  try {
-    initializePrograms();
-    resize();
-    animationFrame = requestAnimationFrame(animate);
-  } catch (error) {
-    canvas.remove();
-    hero.classList.add('hero-pigment-fallback');
-    console.error(error);
+  function draw(phase){
+    gl.disable(gl.BLEND);gl.useProgram(backgroundProgram);gl.bindVertexArray(emptyVao);setCommon(backgroundU,phase);gl.uniform1f(backgroundU.uTime,elapsed);gl.uniform3fv(backgroundU['uPalette[0]'],new Float32Array(PALETTE.flat()));gl.drawArrays(gl.TRIANGLES,0,3);
+    gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.useProgram(renderProgram);gl.bindVertexArray(sets[source].vao);setCommon(renderU,phase);gl.uniform1f(renderU.uDpr,dpr);gl.uniform1f(renderU.uPointMin,CONFIG.pointSizeMin);gl.uniform1f(renderU.uPointMax,CONFIG.pointSizeMax);gl.uniform3fv(renderU['uPalette[0]'],new Float32Array(PALETTE.flat()));gl.drawArrays(gl.POINTS,0,count);
   }
   function resize(){ if(!logoMask)return;const r=hero.getBoundingClientRect();width=Math.max(1,r.width);height=Math.max(1,r.height);aspect=width/height;dpr=Math.min(devicePixelRatio||1,mobileQuery.matches?CONFIG.mobileDprCap:CONFIG.desktopDprCap);canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);canvas.style.width=width+'px';canvas.style.height=height+'px';gl.viewport(0,0,canvas.width,canvas.height);initParticles(); }
   function animate(now){ if(!visible)return;const raw=Math.min(.033,(now-lastTime)/1000||.0167),dt=reducedQuery.matches?raw*.12:raw;lastTime=now;elapsed+=dt;const phase=collisionPhase(raw);update(dt,phase);draw(phase);pointer.vx*=.76;pointer.vy*=.76;frame=requestAnimationFrame(animate); }
