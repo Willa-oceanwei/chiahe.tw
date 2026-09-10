@@ -3897,7 +3897,10 @@ input, select, textarea {
 			position: relative;
 			z-index: 2;
 			align-self: flex-end;
-			max-width: 760px;
+			width: min(46vw, 600px);
+			max-width: none;
+			margin-left: 0;
+			margin-right: auto;
 			padding-top: 7rem;
 			padding-bottom: clamp(3rem, 8vh, 6rem);
 		}
@@ -3914,6 +3917,7 @@ input, select, textarea {
 			font-weight: 600;
 			letter-spacing: 0.32em;
 			line-height: 1.4;
+			color: #d9b75f;
 		}
 
 		#intro .hero-copy__kicker {
@@ -3921,11 +3925,12 @@ input, select, textarea {
 			font-size: clamp(0.95rem, 1.35vw, 1.15rem);
 			font-weight: 400;
 			letter-spacing: 0.1em;
+			color: #d9b75f;
 		}
 
 		#intro .hero-copy__title {
 			margin: clamp(1.3rem, 3vh, 2.2rem) 0 1.5rem;
-			font-size: clamp(2.65rem, 5.7vw, 5.6rem);
+			font-size: clamp(2.65rem, 4.8vw, 4.9rem);
 			font-weight: 600;
 			letter-spacing: -0.045em;
 			line-height: 1.04;
@@ -3936,8 +3941,12 @@ input, select, textarea {
 			white-space: nowrap;
 		}
 
-		#intro .hero-copy__title span + span {
+		#intro .hero-copy__title span:nth-child(2) {
 			transform: translateX(clamp(0.7rem, 3.5vw, 3.2rem));
+		}
+
+		#intro .hero-copy__title span:nth-child(3) {
+			transform: translateX(clamp(0.15rem, 1.2vw, 1rem));
 		}
 
 		#intro .hero-copy__body {
@@ -3980,6 +3989,7 @@ input, select, textarea {
 			@media screen and (max-width: 736px) {
 
 				#intro .hero-copy {
+					width: 100%;
 					padding: 6rem 1.5rem 2.5rem;
 				}
 
@@ -3988,8 +3998,12 @@ input, select, textarea {
 					letter-spacing: -0.05em;
 				}
 
-				#intro .hero-copy__title span + span {
+				#intro .hero-copy__title span:nth-child(2) {
 					transform: translateX(0.5rem);
+				}
+
+				#intro .hero-copy__title span:nth-child(3) {
+					transform: none;
 				}
 
 				#intro .hero-copy__body {
