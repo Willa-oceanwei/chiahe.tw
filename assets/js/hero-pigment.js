@@ -7,14 +7,14 @@
     desktopCount: 20000, mobileCount: 8000, reducedMotionCount: 2800,
     skeletonRatio: 0.42, flowRatio: 0.30, freeRatio: 0.28,
     pointSizeMin: 1.35, pointSizeMax: 6.8,
-    approachDuration: 1.18, compressionDuration: 0.42, impactDuration: 0.32,
-    ribbonDuration: 3.6, reformDuration: 4.2,
+    approachDuration: 1.28, compressionDuration: 0.48, impactDuration: 0.38,
+    ribbonDuration: 4.4, reformDuration: 4.2,
     collisionIntervalMin: 4.8, collisionIntervalMax: 7.4,
     collisionRadius: 0.145, desktopDprCap: 1.65, mobileDprCap: 1.25
   };
   const PALETTE = [
-    [0.12, 0.72, 0.78], [0.88, 0.24, 0.56], [0.96, 0.70, 0.18],
-    [0.96, 0.40, 0.17], [0.57, 0.25, 0.92]
+    [0.10, 0.76, 0.86], [0.92, 0.20, 0.58], [0.98, 0.71, 0.20],
+    [0.98, 0.38, 0.18], [0.60, 0.24, 0.96]
   ];
   const LOGO_MASK_URL = 'images/chiahe_logo_transparent.png?v=logo-restore-1';
   window.HERO_PIGMENT_CONFIG = CONFIG;
@@ -82,21 +82,21 @@
         toward.x/=uAspect;
         float local=smoothstep(.42,0.0,dist);
         if(phase<1.0){ // approach: both continuous colour bands visibly converge
-          v += toward*(.48+phase*.78)*uEnergy*local*uDelta;
+          v += toward*(.62+phase*.98)*uEnergy*local*uDelta;
         } else if(phase<2.0){ // narrow, slow, dense compression at the brand core
-          v += toward*2.7*uEnergy*local*uDelta;
-          v *= 1.0-local*(.12+.13*uEnergy);
+          v += toward*3.45*uEnergy*local*uDelta;
+          v *= 1.0-local*(.17+.16*uEnergy);
         } else if(phase<3.0){ // arrow-led release, tangential shear, small shock
           vec2 normal=normalize(metric(p-uCore)+vec2(.0001)); normal.x/=uAspect;
           float impact=1.0-(phase-2.0);
-          float mixed=step(fract(aSeed*37.17),mix(.18,.30,uEnergy));
-          v += vec2(2.15+.9*uEnergy,(aSeed-.5)*.58)*local*impact*mixed*uDelta;
-          v += vec2(-normal.y,normal.x)*sin(aSeed*49.0)*1.25*local*impact*uDelta;
-          v += normal*.38*local*impact*uDelta;
+          float mixed=step(fract(aSeed*37.17),mix(.25,.42,uEnergy));
+          v += vec2(2.7+1.15*uEnergy,(aSeed-.5)*.68)*local*impact*mixed*uDelta;
+          v += vec2(-normal.y,normal.x)*sin(aSeed*49.0)*1.65*local*impact*uDelta;
+          v += normal*.46*local*impact*uDelta;
         } else { // long mixed ribbon keeps travelling along the arrow
-          float mixed=step(fract(aSeed*37.17),mix(.18,.30,uEnergy));
+          float mixed=step(fract(aSeed*37.17),mix(.25,.42,uEnergy));
           float ribbonLife=1.0-smoothstep(3.0,4.0,phase);
-          v += vec2(.32, sin(aSeed*41.0)*.025)*mixed*ribbonLife*uDelta;
+          v += vec2(.42, sin(aSeed*41.0)*.035)*mixed*ribbonLife*uDelta;
         }
       }
 
@@ -131,29 +131,36 @@
       float impact=(uPhase>=2.0&&uPhase<3.0)?1.0-(uPhase-2.0):0.0;
       size*=1.0+smoothstep(.18,0.0,d)*impact*mix(.3,.8,uEnergy);
       int group=int(aGroup+.5); vec3 colour=uPalette[group];
-      bool participant=aGroup<1.5; float mixed=step(fract(aSeed*37.17),mix(.18,.30,uEnergy));
-      float ribbon=uPhase>1.72 ? smoothstep(.24,0.0,abs(aPosition.y-uCore.y))*step(uCore.x-.04,aPosition.x) : 0.0;
+      bool participant=aGroup<1.5; float mixed=step(fract(aSeed*37.17),mix(.25,.42,uEnergy));
+      float ribbon=uPhase>1.72 ? smoothstep(.28,0.0,abs(aPosition.y-uCore.y))*step(uCore.x-.04,aPosition.x) : 0.0;
       float newColour=(participant?mixed:0.0)*max(smoothstep(.23,0.0,d),ribbon)*smoothstep(1.72,2.2,uPhase);
       colour=mix(colour,uPalette[4],newColour);
       if(aKind<.5) colour=mix(colour,vec3(.67,.57,.72),.28);
       float alpha=aKind<.5?mix(.48,.78,distribution):mix(.30,.72,distribution);
-      alpha+=newColour*.18; gl_PointSize=size*uDpr*(1.0+newColour*.18); vColour=vec4(colour,alpha);
+      alpha+=newColour*.24; gl_PointSize=size*uDpr*(1.0+newColour*.28); vColour=vec4(colour,alpha);
     }`;
   const RENDER_FRAGMENT = `#version 300 es
     precision mediump float; in vec4 vColour; out vec4 outColour;
-    void main(){ vec2 q=gl_PointCoord*2.0-1.0; float r=dot(q,q); if(r>1.0)discard; outColour=vec4(vColour.rgb,vColour.a*smoothstep(1.0,.08,r)); }`;
+    void main(){ vec2 q=gl_PointCoord*2.0-1.0; float r=dot(q,q); if(r>1.0)discard; float halo=smoothstep(1.0,.03,r); float core=smoothstep(.24,0.0,r); outColour=vec4(vColour.rgb*(1.0+core*.18),vColour.a*(halo*.72+core*.28)); }`;
   const BACKGROUND_VERTEX = `#version 300 es
     precision highp float; out vec2 vUv; void main(){ vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);vUv=p;gl_Position=vec4(p*2.0-1.0,0,1);}`;
   const BACKGROUND_FRAGMENT = `#version 300 es
     precision highp float; in vec2 vUv; uniform float uTime,uAspect,uPhase,uEnergy; uniform vec2 uCore; uniform vec3 uPalette[5]; out vec4 outColour;
     void main(){
-      vec3 c=mix(vec3(.055,.085,.205),vec3(.14,.075,.24),vUv.x*.62+vUv.y*.18);
+      vec3 c=mix(vec3(.025,.040,.115),vec3(.105,.045,.185),vUv.x*.62+vUv.y*.18);
       vec2 q=vec2((vUv.x-uCore.x)*uAspect,vUv.y-uCore.y);
-      float logoFog=smoothstep(.48,.04,length(q))*0.07; c=mix(c,mix(uPalette[0],uPalette[1],vUv.y),logoFog);
+      vec2 drift=vec2(.045*sin(uTime*.11),.035*cos(uTime*.09));
+      float cloudA=smoothstep(.50,.025,length(q+drift));
+      float cloudB=smoothstep(.34,.012,length(q*vec2(.72,1.25)-vec2(.10,-.07)));
+      float filament=.5+.5*sin(q.x*18.0-q.y*13.0+uTime*.25);
+      float logoFog=cloudA*(.085+filament*.028)+cloudB*.052;
+      c=mix(c,mix(uPalette[0],uPalette[1],smoothstep(-.24,.24,q.y)),logoFog);
+      c=mix(c,uPalette[2],smoothstep(.31,.0,length(q-vec2(-.11,.14)))*.035);
       // Fog follows particle impact by about 160 ms (the latter half of phase 2).
       float delayed=smoothstep(2.50,2.82,uPhase)*(1.0-smoothstep(3.55,4.0,uPhase));
-      vec2 trail=q-vec2(max(q.x,0.0)*.34,0); float fog=smoothstep(.30,.0,length(trail))*delayed*(.18+.14*uEnergy);
-      c=mix(c,uPalette[4],fog); outColour=vec4(c,1);
+      vec2 trail=q-vec2(max(q.x,0.0)*.34,0); float fog=smoothstep(.35,.0,length(trail))*delayed*(.25+.18*uEnergy);
+      float coreGlow=smoothstep(.16,.0,length(q))*smoothstep(1.45,2.15,uPhase)*(1.0-smoothstep(3.25,3.85,uPhase));
+      c=mix(c,uPalette[4],fog); c+=uPalette[4]*coreGlow*(.08+.10*uEnergy); outColour=vec4(c,1);
     }`;
 
   function shader(type, source) { const s=gl.createShader(type); gl.shaderSource(s,source); gl.compileShader(s); if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
