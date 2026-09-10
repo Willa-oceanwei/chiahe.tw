@@ -75,10 +75,14 @@
         if(aKind>2.5){
           vec2 radial=metric(aHome-uCore);
           vec2 orbitTangent=normalize(vec2(-radial.y,radial.x)+vec2(.0001));
+          vec2 radialDirection=normalize(radial+vec2(.0001));
           orbitTangent.x/=uAspect;
-          v += toHome*(.12+reform*.34)*uDelta;
-          v += orbitTangent*(.022+.008*sin(uTime*.31+aSeed*17.0))*uDelta;
-          v += curl(p*1.7,aSeed)*.018*uDelta;
+          radialDirection.x/=uAspect;
+          float orbitBreath=sin(uTime*.42+aSeed*9.0);
+          v += toHome*(.18+reform*.38)*uDelta;
+          v += radialDirection*orbitBreath*.008*uDelta;
+          v += orbitTangent*(.052+.014*sin(uTime*.31+aSeed*17.0))*uDelta;
+          v += curl(p*1.7,aSeed)*.024*uDelta;
         }else{
           v += toHome*(.20+reform*.75)*uDelta;
           v += curl(p*2.1,aSeed)*.075*uDelta;
@@ -134,8 +138,8 @@
     out vec4 vColour; out float vGlow;
     void main(){
       gl_Position=vec4(aPosition.x*2.0-1.0,1.0-aPosition.y*2.0,0,1);
-      float distribution=fract(aSeed*17.731), kindSize=aKind<.5?.82:(aKind<1.5?1.05:(aKind>2.5?.24:.42));
-      float size=mix(uPointMin,uPointMax,pow(distribution,2.1))*kindSize;
+      float distribution=fract(aSeed*17.731), kindSize=aKind<.5?.82:(aKind<1.5?1.05:.42);
+      float size=aKind>2.5 ? mix(.78,1.65,pow(distribution,.8)) : mix(uPointMin,uPointMax,pow(distribution,2.1))*kindSize;
       float d=length(vec2((aPosition.x-uCore.x)*uAspect,aPosition.y-uCore.y));
       float impact=(uPhase>=2.0&&uPhase<3.0)?1.0-(uPhase-2.0):0.0;
       size*=1.0+smoothstep(.18,0.0,d)*impact*mix(.3,.8,uEnergy);
@@ -145,9 +149,9 @@
       float newColour=(participant?mixed:0.0)*max(smoothstep(.23,0.0,d),ribbon)*smoothstep(1.72,2.2,uPhase);
       colour=mix(colour,uPalette[4],newColour);
       if(aKind<.5) colour=mix(colour,vec3(.67,.57,.72),.28);
-      float alpha=aKind<.5?mix(.55,.88,distribution):(aKind<1.5?mix(.34,.78,distribution):(aKind>2.5?mix(.12,.32,distribution):mix(.20,.48,distribution)));
+      float alpha=aKind<.5?mix(.55,.88,distribution):(aKind<1.5?mix(.34,.78,distribution):(aKind>2.5?mix(.28,.52,distribution):mix(.20,.48,distribution)));
       float foreground=smoothstep(.84,.97,fract(aSeed*29.71));
-      if(aKind>2.5)foreground*=.25;
+      if(aKind>2.5)foreground*=.40;
       float shimmer=.68+.32*sin(uTime*1.35+aSeed*41.0);
       vGlow=clamp(foreground*shimmer+newColour*.92+impact*smoothstep(.22,0.0,d)*.58,0.0,1.0);
       alpha+=newColour*.28+vGlow*.14; gl_PointSize=size*uDpr*(1.0+newColour*.34+foreground*.24); vColour=vec4(colour,alpha);
@@ -225,19 +229,19 @@
       else if(kind===1){ group=i%10<4?0:(i%10<8?1:2); home=logoGeometry(1); }
       else {
         group=i%5;
-        if(i%10<7){
+        if(i%10<9){
           ring=true;
           kind=3;
           // A fine, breathing powder orbit frames the denser Logo without
           // reading as a hard geometric stroke.
-          const angle=seed*Math.PI*2, radius=random(.315,.36);
+          const angle=seed*Math.PI*2, radius=random(.32,.385);
           home=[(mobileQuery.matches?.57:.69)+Math.cos(angle)*radius/aspect,.5+Math.sin(angle)*radius];
         }else{
           home=logoGeometry(i%4===0?0:1);
           home[0]+=random(-.12,.12)/aspect; home[1]+=random(-.11,.11);
         }
       }
-      const spread=kind===0?.006:(kind===1?.025:(ring?.018:.075)); positions[i*2]=home[0]+random(-spread,spread)/aspect; positions[i*2+1]=home[1]+random(-spread,spread);
+      const spread=kind===0?.006:(kind===1?.025:(ring?.012:.075)); positions[i*2]=home[0]+random(-spread,spread)/aspect; positions[i*2+1]=home[1]+random(-spread,spread);
       velocities[i*2]=random(-.01,.01); velocities[i*2+1]=random(-.01,.01); homes[i*2]=home[0]; homes[i*2+1]=home[1]; seeds[i]=seed; groups[i]=group; kinds[i]=kind;
     } return {positions,velocities,seeds,groups,kinds,homes};
   }
