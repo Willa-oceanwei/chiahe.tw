@@ -38,10 +38,7 @@
     [0.12, 0.72, 0.78], [0.88, 0.24, 0.56], [0.96, 0.70, 0.18],
     [0.96, 0.40, 0.17], [0.57, 0.25, 0.92]
   ];
-  // The first recognizable Logo build loaded the root-level transparent PNG.
-  // Prefer the current asset path, but retain that proven path for deployments
-  // where GitHub Pages still publishes the original filename.
-  const LOGO_MASK_URLS = ['images/chiahe-logo-symbol.png','chiahe_logo_transparent.png'];
+  const LOGO_MASK_URL = 'chiahe_logo_transparent.png?v=20260910-2';
 
   window.HERO_PIGMENT_CONFIG = PIGMENT_CONFIG;
   window.HERO_PIGMENT_PALETTE = PALETTE;
@@ -518,17 +515,8 @@
       gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,surface);
       if(logoPoints.length)initializeParticles();
     };
-    let sourceIndex=0;
-    image.onerror=()=>{
-      sourceIndex+=1;
-      if(sourceIndex<LOGO_MASK_URLS.length){
-        console.warn(`Hero logo mask unavailable, trying legacy asset: ${LOGO_MASK_URLS[sourceIndex]}`);
-        image.src=LOGO_MASK_URLS[sourceIndex];
-      }else{
-        console.error(`Hero logo masks unavailable: ${LOGO_MASK_URLS.join(', ')}`);
-      }
-    };
-    image.src=LOGO_MASK_URLS[sourceIndex];
+    image.onerror=()=>console.error(`Hero logo mask unavailable: ${LOGO_MASK_URL}`);
+    image.src=LOGO_MASK_URL;
   }
 
   function makeInitialState(count) {
