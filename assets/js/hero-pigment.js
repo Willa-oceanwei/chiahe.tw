@@ -47,6 +47,19 @@
   const hero = document.getElementById('intro');
   if (!hero) return;
 
+  const rendererDebug = new URLSearchParams(window.location.search).get('debugPigment')==='renderer';
+  function reportRenderer(name, detail) {
+    window.HERO_PIGMENT_RENDERER = { name, detail: detail ? String(detail.message||detail) : '' };
+    hero.dataset.pigmentRenderer = name;
+    console.info(`Hero pigment renderer: ${name}`,detail||'');
+    if (rendererDebug) {
+      const badge = document.createElement('div');
+      badge.textContent = name==='webgl2' ? 'HERO WEBGL2 ACTIVE' : `HERO 2D FALLBACK: ${window.HERO_PIGMENT_RENDERER.detail}`;
+      badge.style.cssText = 'position:absolute;right:12px;bottom:12px;z-index:4;max-width:70%;padding:6px 9px;background:#111827;color:#fff;font:600 11px/1.3 monospace;border:1px solid rgba(255,255,255,.45);border-radius:3px;pointer-events:none';
+      hero.appendChild(badge);
+    }
+  }
+
   if (SANITY_MODE) {
     const badge = document.createElement('div');
     badge.textContent = 'HERO SANITY ACTIVE';
@@ -57,6 +70,7 @@
 
   function startMovingFallback(failedCanvas, reason) {
     console.error('Hero WebGL pipeline unavailable; starting 2D movement fallback.',reason);
+    reportRenderer('2d-fallback',reason);
     const fallbackCanvas = document.createElement('canvas');
     fallbackCanvas.className = 'hero-pigment-canvas';
     fallbackCanvas.setAttribute('aria-hidden','true');
@@ -782,6 +796,7 @@
     initializePrograms();
     createLogoTexture();
     resize();
+    reportRenderer('webgl2');
     animationFrame = requestAnimationFrame(animate);
     loadLogoMask();
   } catch (error) {
