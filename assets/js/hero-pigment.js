@@ -647,6 +647,7 @@
     setPalette(renderUniforms['uPalette[0]']);
     setInteractionUniforms(renderUniforms,centers,collisionPhase);
     gl.drawArrays(gl.POINTS,0,particleCount);
+    debugGlError('render draw');
   }
 
   function animate(time) {
