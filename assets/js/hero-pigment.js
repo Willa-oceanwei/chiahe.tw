@@ -13,8 +13,8 @@
     collisionRadius: 0.145, desktopDprCap: 1.65, mobileDprCap: 1.25
   };
   const PALETTE = [
-    [0.10, 0.76, 0.86], [0.92, 0.20, 0.58], [0.98, 0.71, 0.20],
-    [0.98, 0.38, 0.18], [0.60, 0.24, 0.96]
+    [0.06, 0.86, 0.96], [1.00, 0.14, 0.58], [1.00, 0.78, 0.16],
+    [1.00, 0.32, 0.12], [0.68, 0.22, 1.00]
   ];
   const LOGO_MASK_URL = 'images/chiahe_logo_transparent.png?v=logo-restore-1';
   window.HERO_PIGMENT_CONFIG = CONFIG;
@@ -136,21 +136,21 @@
       float newColour=(participant?mixed:0.0)*max(smoothstep(.23,0.0,d),ribbon)*smoothstep(1.72,2.2,uPhase);
       colour=mix(colour,uPalette[4],newColour);
       if(aKind<.5) colour=mix(colour,vec3(.67,.57,.72),.28);
-      float alpha=aKind<.5?mix(.48,.78,distribution):mix(.30,.72,distribution);
-      float foreground=smoothstep(.90,.985,fract(aSeed*29.71));
-      float shimmer=.72+.28*sin(uTime*1.35+aSeed*41.0);
-      vGlow=clamp(foreground*shimmer+newColour*.82+impact*smoothstep(.2,0.0,d)*.45,0.0,1.0);
-      alpha+=newColour*.24+vGlow*.10; gl_PointSize=size*uDpr*(1.0+newColour*.28+foreground*.18); vColour=vec4(colour,alpha);
+      float alpha=aKind<.5?mix(.55,.88,distribution):mix(.34,.78,distribution);
+      float foreground=smoothstep(.84,.97,fract(aSeed*29.71));
+      float shimmer=.68+.32*sin(uTime*1.35+aSeed*41.0);
+      vGlow=clamp(foreground*shimmer+newColour*.92+impact*smoothstep(.22,0.0,d)*.58,0.0,1.0);
+      alpha+=newColour*.28+vGlow*.14; gl_PointSize=size*uDpr*(1.0+newColour*.34+foreground*.24); vColour=vec4(colour,alpha);
     }`;
   const RENDER_FRAGMENT = `#version 300 es
     precision mediump float; in vec4 vColour; in float vGlow; out vec4 outColour;
-    void main(){ vec2 q=gl_PointCoord*2.0-1.0; float r=dot(q,q); if(r>1.0)discard; float halo=smoothstep(1.0,.03,r); float core=smoothstep(.24,0.0,r); vec3 luminous=vColour.rgb*(1.0+core*(.18+vGlow*.48)+halo*vGlow*.12); outColour=vec4(luminous,vColour.a*(halo*.72+core*.28)); }`;
+    void main(){ vec2 q=gl_PointCoord*2.0-1.0; float r=dot(q,q); if(r>1.0)discard; float halo=smoothstep(1.0,.03,r); float core=smoothstep(.28,0.0,r); vec3 luminous=vColour.rgb*(1.0+core*(.24+vGlow*.72)+halo*vGlow*.18); outColour=vec4(luminous,vColour.a*(halo*.66+core*.34)); }`;
   const BACKGROUND_VERTEX = `#version 300 es
     precision highp float; out vec2 vUv; void main(){ vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);vUv=p;gl_Position=vec4(p*2.0-1.0,0,1);}`;
   const BACKGROUND_FRAGMENT = `#version 300 es
     precision highp float; in vec2 vUv; uniform float uTime,uAspect,uPhase,uEnergy; uniform vec2 uCore; uniform vec3 uPalette[5]; out vec4 outColour;
     void main(){
-      vec3 c=mix(vec3(.025,.040,.115),vec3(.105,.045,.185),vUv.x*.62+vUv.y*.18);
+      vec3 c=mix(vec3(.012,.018,.065),vec3(.070,.025,.125),vUv.x*.62+vUv.y*.18);
       vec2 q=vec2((vUv.x-uCore.x)*uAspect,vUv.y-uCore.y);
       vec2 drift=vec2(.045*sin(uTime*.11),.035*cos(uTime*.09));
       float cloudA=smoothstep(.50,.025,length(q+drift));
@@ -163,7 +163,8 @@
       float delayed=smoothstep(2.50,2.82,uPhase)*(1.0-smoothstep(3.55,4.0,uPhase));
       vec2 trail=q-vec2(max(q.x,0.0)*.34,0); float fog=smoothstep(.35,.0,length(trail))*delayed*(.25+.18*uEnergy);
       float coreGlow=smoothstep(.16,.0,length(q))*smoothstep(1.45,2.15,uPhase)*(1.0-smoothstep(3.25,3.85,uPhase));
-      c=mix(c,uPalette[4],fog); c+=uPalette[4]*coreGlow*(.08+.10*uEnergy); outColour=vec4(c,1);
+      c=mix(c,uPalette[4],fog); c+=uPalette[4]*coreGlow*(.13+.15*uEnergy);
+      float vignette=smoothstep(.28,.86,length(vUv-.5)); c*=mix(1.0,.72,vignette); outColour=vec4(c,1);
     }`;
 
   function shader(type, source) { const s=gl.createShader(type); gl.shaderSource(s,source); gl.compileShader(s); if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
