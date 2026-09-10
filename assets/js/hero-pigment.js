@@ -92,8 +92,6 @@
   let lastTime = performance.now();
   let elapsed = 0;
   let visible = !document.hidden;
-  let logoTexture;
-  let logoPoints = [];
 
   const random = (min, max) => min + Math.random() * (max - min);
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -365,8 +363,7 @@
     backgroundProgram = createProgram(BACKGROUND_VERTEX, BACKGROUND_FRAGMENT);
     updateUniforms = locations(updateProgram, [
       'uTime','uDelta','uAspect','uFlowStrength','uClusterStrength','uDamping',
-      'uCenters[0]','uMouse','uMouseVelocity','uCollision','uCollisionGroups','uWave',
-      'uLogoMask','uLogoField'
+      'uCenters[0]','uMouse','uMouseVelocity','uCollision','uCollisionGroups','uWave'
     ]);
     renderUniforms = locations(renderProgram, [
       'uAspect','uDpr','uPointMin','uPointMax','uPalette[0]','uCollision','uCollisionGroups'
@@ -577,10 +574,6 @@
     gl.uniform4f(updateUniforms.uMouse,pointer.x,pointer.y,pointer.active,PIGMENT_CONFIG.mouseOuterRadius);
     gl.uniform2f(updateUniforms.uMouseVelocity,pointer.vx,pointer.vy);
     gl.uniform4f(updateUniforms.uWave,resonance.x,resonance.y,resonance.age,PIGMENT_CONFIG.resonanceDuration);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D,logoTexture);
-    gl.uniform1i(updateUniforms.uLogoMask,0);
-    gl.uniform3f(updateUniforms.uLogoField,mobileQuery.matches ? 0.57 : 0.69,0.55,PIGMENT_CONFIG.logoAttractionStrength);
     setInteractionUniforms(updateUniforms,centers,collisionPhase);
     gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,0,target.position);
     gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,1,target.velocity);
