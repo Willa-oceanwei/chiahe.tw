@@ -42,6 +42,7 @@
 
   window.HERO_PIGMENT_CONFIG = PIGMENT_CONFIG;
   window.HERO_PIGMENT_PALETTE = PALETTE;
+  const SANITY_MODE = new URLSearchParams(window.location.search).get('debugPigment')==='sanity';
 
   const hero = document.getElementById('intro');
   if (!hero) return;
@@ -115,8 +116,7 @@
     uniform vec4 uCollision;
     uniform vec2 uCollisionGroups;
     uniform vec4 uWave;
-    uniform sampler2D uLogoMask;
-    uniform vec3 uLogoField;
+    uniform float uSanityMode;
 
     out vec2 vPosition;
     out vec2 vVelocity;
@@ -138,6 +138,16 @@
     void main() {
       vec2 position = aPosition;
       vec2 velocity = aVelocity;
+
+      if (uSanityMode > 0.5) {
+        velocity = vec2(0.12,0.0);
+        position += velocity*uDelta;
+        if (position.x>1.12) position.x=-0.12;
+        vPosition = position;
+        vVelocity = velocity;
+        return;
+      }
+
       int groupIndex = int(aGroup + 0.5);
       vec2 center = uCenters[groupIndex];
 
@@ -326,8 +336,9 @@
     gl.compileShader(shader);
     if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
       const message = gl.getShaderInfoLog(shader);
+      console.error(message);
       gl.deleteShader(shader);
-      throw new Error(`Hero pigment shader failed: ${message}`);
+      throw new Error(message);
     }
     return shader;
   }
@@ -340,8 +351,9 @@
     gl.linkProgram(program);
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
       const message = gl.getProgramInfoLog(program);
+      console.error(message);
       gl.deleteProgram(program);
-      throw new Error(`Hero pigment program failed: ${message}`);
+      throw new Error(message);
     }
     return program;
   }
@@ -363,7 +375,7 @@
     backgroundProgram = createProgram(BACKGROUND_VERTEX, BACKGROUND_FRAGMENT);
     updateUniforms = locations(updateProgram, [
       'uTime','uDelta','uAspect','uFlowStrength','uClusterStrength','uDamping',
-      'uCenters[0]','uMouse','uMouseVelocity','uCollision','uCollisionGroups','uWave'
+      'uCenters[0]','uMouse','uMouseVelocity','uCollision','uCollisionGroups','uWave','uSanityMode'
     ]);
     renderUniforms = locations(renderProgram, [
       'uAspect','uDpr','uPointMin','uPointMax','uPalette[0]','uCollision','uCollisionGroups'
@@ -574,6 +586,7 @@
     gl.uniform4f(updateUniforms.uMouse,pointer.x,pointer.y,pointer.active,PIGMENT_CONFIG.mouseOuterRadius);
     gl.uniform2f(updateUniforms.uMouseVelocity,pointer.vx,pointer.vy);
     gl.uniform4f(updateUniforms.uWave,resonance.x,resonance.y,resonance.age,PIGMENT_CONFIG.resonanceDuration);
+    gl.uniform1f(updateUniforms.uSanityMode,SANITY_MODE ? 1 : 0);
     setInteractionUniforms(updateUniforms,centers,collisionPhase);
     gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,0,target.position);
     gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,1,target.velocity);
@@ -671,6 +684,13 @@
   }
 
   try {
+    if (SANITY_MODE) {
+      const badge = document.createElement('div');
+      badge.textContent = 'HERO SANITY ACTIVE';
+      badge.setAttribute('aria-live','polite');
+      badge.style.cssText = 'position:absolute;right:12px;bottom:12px;z-index:3;padding:6px 9px;background:#111827;color:#fff;font:600 11px/1.2 monospace;letter-spacing:.08em;border:1px solid rgba(255,255,255,.45);border-radius:3px;pointer-events:none';
+      hero.appendChild(badge);
+    }
     initializePrograms();
     createLogoTexture();
     resize();
