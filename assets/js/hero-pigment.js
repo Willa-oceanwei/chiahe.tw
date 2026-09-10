@@ -46,6 +46,63 @@
 
   const hero = document.getElementById('intro');
   if (!hero) return;
+
+  if (SANITY_MODE) {
+    const badge = document.createElement('div');
+    badge.textContent = 'HERO SANITY ACTIVE';
+    badge.setAttribute('aria-live','polite');
+    badge.style.cssText = 'position:absolute;right:12px;bottom:12px;z-index:3;padding:6px 9px;background:#111827;color:#fff;font:600 11px/1.2 monospace;letter-spacing:.08em;border:1px solid rgba(255,255,255,.45);border-radius:3px;pointer-events:none';
+    hero.appendChild(badge);
+  }
+
+  function startMovingFallback(failedCanvas, reason) {
+    console.error('Hero WebGL pipeline unavailable; starting 2D movement fallback.',reason);
+    const fallbackCanvas = document.createElement('canvas');
+    fallbackCanvas.className = 'hero-pigment-canvas';
+    fallbackCanvas.setAttribute('aria-hidden','true');
+    failedCanvas.replaceWith(fallbackCanvas);
+    const context = fallbackCanvas.getContext('2d');
+    if (!context) return;
+    const particles = Array.from({length: 900},(_,index)=>({
+      x: Math.random(), y: Math.random(),
+      vx: 0.018+Math.random()*0.026, vy: (Math.random()-.5)*0.018,
+      radius: 0.7+Math.random()*1.45, colour: PALETTE[index%PALETTE.length]
+    }));
+    let fallbackTime = performance.now();
+    function resizeFallback() {
+      const rect = hero.getBoundingClientRect();
+      const ratio = Math.min(devicePixelRatio||1,1.5);
+      fallbackCanvas.width = Math.max(1,Math.round(rect.width*ratio));
+      fallbackCanvas.height = Math.max(1,Math.round(rect.height*ratio));
+      fallbackCanvas.style.width = `${rect.width}px`;
+      fallbackCanvas.style.height = `${rect.height}px`;
+      context.setTransform(ratio,0,0,ratio,0,0);
+    }
+    function moveFallback(time) {
+      const delta = Math.min(0.033,(time-fallbackTime)/1000||0.0167);
+      fallbackTime = time;
+      const rect = hero.getBoundingClientRect();
+      context.fillStyle = '#111a3d';
+      context.fillRect(0,0,rect.width,rect.height);
+      particles.forEach((particle,index)=>{
+        particle.x += particle.vx*delta;
+        particle.y += (particle.vy+Math.sin(time*.00035+index)*.006)*delta;
+        if (particle.x>1.03) particle.x=-.03;
+        if (particle.y>1.03) particle.y=-.03;
+        if (particle.y<-.03) particle.y=1.03;
+        const colour = particle.colour.map(value=>Math.round(value*255));
+        context.fillStyle = `rgba(${colour[0]},${colour[1]},${colour[2]},.56)`;
+        context.beginPath();
+        context.arc(particle.x*rect.width,particle.y*rect.height,particle.radius,0,Math.PI*2);
+        context.fill();
+      });
+      requestAnimationFrame(moveFallback);
+    }
+    resizeFallback();
+    window.addEventListener('resize',resizeFallback,{passive:true});
+    requestAnimationFrame(moveFallback);
+  }
+
   const canvas = document.createElement('canvas');
   canvas.className = 'hero-pigment-canvas';
   canvas.setAttribute('aria-hidden', 'true');
@@ -59,8 +116,8 @@
     preserveDrawingBuffer: false
   });
   if (!gl) {
-    canvas.remove();
     hero.classList.add('hero-pigment-fallback');
+    startMovingFallback(canvas,new Error('WebGL2 context creation failed'));
     return;
   }
 
@@ -697,9 +754,8 @@
     animationFrame = requestAnimationFrame(animate);
     loadLogoMask();
   } catch (error) {
-    canvas.remove();
     hero.classList.add('hero-pigment-fallback');
-    console.error(error);
+    startMovingFallback(canvas,error);
   }
   function logoGeometry(kind){
     const collection=kind===0?logoMask.edge:logoMask.inside;
