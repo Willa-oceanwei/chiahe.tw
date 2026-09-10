@@ -16,6 +16,7 @@
     [0.12, 0.72, 0.78], [0.88, 0.24, 0.56], [0.96, 0.70, 0.18],
     [0.96, 0.40, 0.17], [0.57, 0.25, 0.92]
   ];
+  const LOGO_MASK_URL = 'chiahe_logo_transparent.png';
   window.HERO_PIGMENT_CONFIG = CONFIG;
   window.HERO_PIGMENT_PALETTE = PALETTE;
 
@@ -34,7 +35,7 @@
   const collision = { age: 99, next: 2.2, active: false, energy: 0.62 };
   let width = 1, height = 1, aspect = 1, dpr = 1, count = 0, source = 0;
   let sets = [], updateProgram, renderProgram, backgroundProgram, updateU, renderU, backgroundU, emptyVao;
-  let frame = 0, lastTime = performance.now(), elapsed = 0, visible = !document.hidden;
+  let frame = 0, lastTime = performance.now(), elapsed = 0, visible = !document.hidden, logoMask;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const random = (a, b) => a + Math.random() * (b - a);
 
@@ -165,26 +166,43 @@
     renderU=locations(renderProgram,['uAspect','uDpr','uPointMin','uPointMax','uPhase','uEnergy','uCore','uPalette[0]']);
     backgroundU=locations(backgroundProgram,['uTime','uAspect','uPhase','uEnergy','uCore','uPalette[0]']); emptyVao=gl.createVertexArray();
   }
-  function logoGeometry(t, section){
-    const cx=mobileQuery.matches?.57:.69, cy=.50, rx=.205/aspect, ry=.305;
-    if(section==='arrow'){
-      // Open chevron joined to a horizontal shaft: unmistakable centre arrow and point.
-      const parts=[[[cx-.12/aspect,cy-.055],[cx+.105/aspect,cy-.055]],[[cx+.105/aspect,cy-.055],[cx+.105/aspect,cy-.135]],[[cx+.105/aspect,cy-.135],[cx+.255/aspect,cy]],[[cx+.255/aspect,cy],[cx+.105/aspect,cy+.135]],[[cx+.105/aspect,cy+.135],[cx+.105/aspect,cy+.055]],[[cx+.105/aspect,cy+.055],[cx-.12/aspect,cy+.055]]];
-      const scaled=t*parts.length, pair=parts[Math.min(parts.length-1,Math.floor(scaled))], f=scaled-Math.floor(scaled);
-      return [pair[0][0]+(pair[1][0]-pair[0][0])*f,pair[0][1]+(pair[1][1]-pair[0][1])*f];
-    }
-    // A near-complete outer arc leaves only the arrow exit open on the right.
-    const angle=.25*Math.PI+t*1.50*Math.PI;
-    return [cx+Math.cos(angle)*rx,cy+Math.sin(angle)*ry];
+  function loadLogoMask(){
+    return new Promise((resolve,reject)=>{
+      const image=new Image();
+      image.onload=()=>{
+        const size=420, surface=document.createElement('canvas'); surface.width=size; surface.height=size;
+        const context=surface.getContext('2d',{willReadFrequently:true});
+        const scale=Math.min(size/image.naturalWidth,size/image.naturalHeight), drawWidth=image.naturalWidth*scale, drawHeight=image.naturalHeight*scale;
+        context.clearRect(0,0,size,size); context.drawImage(image,(size-drawWidth)/2,(size-drawHeight)/2,drawWidth,drawHeight);
+        const pixels=context.getImageData(0,0,size,size).data, inside=[], edge=[];
+        const opaque=(x,y)=>x>=0&&x<size&&y>=0&&y<size&&pixels[(y*size+x)*4+3]>48;
+        for(let y=1;y<size-1;y+=2)for(let x=1;x<size-1;x+=2){
+          if(!opaque(x,y))continue;
+          const point=[x/size,y/size]; inside.push(point);
+          if(!opaque(x-2,y)||!opaque(x+2,y)||!opaque(x,y-2)||!opaque(x,y+2))edge.push(point);
+        }
+        if(edge.length<40||inside.length<100)reject(new Error('Logo mask has insufficient opaque pixels'));
+        else resolve({inside,edge});
+      };
+      image.onerror=()=>reject(new Error(`Unable to load Hero logo mask: ${LOGO_MASK_URL}`));
+      image.src=LOGO_MASK_URL;
+    });
+  }
+  function logoGeometry(kind){
+    const collection=kind===0?logoMask.edge:logoMask.inside;
+    const sample=collection[Math.floor(Math.random()*collection.length)];
+    // Keep the PNG's own proportions; aspect correction only maps it into screen space.
+    const centerX=mobileQuery.matches?.57:.69, logoHeight=.61, logoWidth=.61/aspect;
+    return [centerX+(sample[0]-.5)*logoWidth,.5+(sample[1]-.5)*logoHeight];
   }
   function makeState(n){
     const positions=new Float32Array(n*2), velocities=new Float32Array(n*2), seeds=new Float32Array(n), groups=new Float32Array(n), kinds=new Float32Array(n), homes=new Float32Array(n*2);
     const skeletonEnd=Math.floor(n*CONFIG.skeletonRatio), flowEnd=Math.floor(n*(CONFIG.skeletonRatio+CONFIG.flowRatio));
     for(let i=0;i<n;i++){
       const seed=Math.random(); let kind=i<skeletonEnd?0:(i<flowEnd?1:2), group=2, home;
-      if(kind===0){ const arrow=(i%10)>=6; home=logoGeometry(seed,arrow?'arrow':'arc'); group=home[1]<.485?0:(home[1]>.515?1:2); }
-      else if(kind===1){ group=i%10<4?0:(i%10<8?1:2); if(group===2)home=logoGeometry(seed,'arrow'); else { home=logoGeometry(group===0?seed*.48:.52+seed*.48,'arc'); home[0]+=(group===0?.018:-.012)/aspect; } }
-      else { group=i%5; home=logoGeometry(seed,i%3===0?'arrow':'arc'); home[0]+=random(-.12,.12)/aspect; home[1]+=random(-.11,.11); }
+      if(kind===0){ home=logoGeometry(0); group=home[1]<.485?0:(home[1]>.515?1:2); }
+      else if(kind===1){ group=i%10<4?0:(i%10<8?1:2); home=logoGeometry(1); }
+      else { group=i%5; home=logoGeometry(i%4===0?0:1); home[0]+=random(-.12,.12)/aspect; home[1]+=random(-.11,.11); }
       const spread=kind===0?.006:(kind===1?.025:.075); positions[i*2]=home[0]+random(-spread,spread)/aspect; positions[i*2+1]=home[1]+random(-spread,spread);
       velocities[i*2]=random(-.01,.01); velocities[i*2+1]=random(-.01,.01); homes[i*2]=home[0]; homes[i*2+1]=home[1]; seeds[i]=seed; groups[i]=group; kinds[i]=kind;
     } return {positions,velocities,seeds,groups,kinds,homes};
@@ -219,7 +237,7 @@
     gl.disable(gl.BLEND);gl.useProgram(backgroundProgram);gl.bindVertexArray(emptyVao);setCommon(backgroundU,phase);gl.uniform1f(backgroundU.uTime,elapsed);gl.uniform3fv(backgroundU['uPalette[0]'],new Float32Array(PALETTE.flat()));gl.drawArrays(gl.TRIANGLES,0,3);
     gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.useProgram(renderProgram);gl.bindVertexArray(sets[source].vao);setCommon(renderU,phase);gl.uniform1f(renderU.uDpr,dpr);gl.uniform1f(renderU.uPointMin,CONFIG.pointSizeMin);gl.uniform1f(renderU.uPointMax,CONFIG.pointSizeMax);gl.uniform3fv(renderU['uPalette[0]'],new Float32Array(PALETTE.flat()));gl.drawArrays(gl.POINTS,0,count);
   }
-  function resize(){ const r=hero.getBoundingClientRect();width=Math.max(1,r.width);height=Math.max(1,r.height);aspect=width/height;dpr=Math.min(devicePixelRatio||1,mobileQuery.matches?CONFIG.mobileDprCap:CONFIG.desktopDprCap);canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);canvas.style.width=width+'px';canvas.style.height=height+'px';gl.viewport(0,0,canvas.width,canvas.height);initParticles(); }
+  function resize(){ if(!logoMask)return;const r=hero.getBoundingClientRect();width=Math.max(1,r.width);height=Math.max(1,r.height);aspect=width/height;dpr=Math.min(devicePixelRatio||1,mobileQuery.matches?CONFIG.mobileDprCap:CONFIG.desktopDprCap);canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);canvas.style.width=width+'px';canvas.style.height=height+'px';gl.viewport(0,0,canvas.width,canvas.height);initParticles(); }
   function animate(now){ if(!visible)return;const raw=Math.min(.033,(now-lastTime)/1000||.0167),dt=reducedQuery.matches?raw*.12:raw;lastTime=now;elapsed+=dt;const phase=collisionPhase(raw);update(dt,phase);draw(phase);pointer.vx*=.76;pointer.vy*=.76;frame=requestAnimationFrame(animate); }
   function pointerPosition(e){const r=hero.getBoundingClientRect();return[(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height];}
   hero.addEventListener('pointerenter',e=>{if(e.pointerType==='touch')return;const p=pointerPosition(e);pointer.x=pointer.px=p[0];pointer.y=pointer.py=p[1];pointer.active=1;},{passive:true});
@@ -227,5 +245,8 @@
   hero.addEventListener('pointerleave',()=>{pointer.active=0;},{passive:true});
   document.addEventListener('visibilitychange',()=>{visible=!document.hidden;cancelAnimationFrame(frame);if(visible){lastTime=performance.now();frame=requestAnimationFrame(animate);}});
   addEventListener('resize',resize,{passive:true});if(mobileQuery.addEventListener){mobileQuery.addEventListener('change',resize);reducedQuery.addEventListener('change',resize);}
-  try{initPrograms();resize();frame=requestAnimationFrame(animate);}catch(error){canvas.remove();hero.classList.add('hero-pigment-fallback');console.error('Hero pigment animation unavailable',error);}
+  loadLogoMask().then(mask=>{
+    logoMask=mask;
+    try{initPrograms();resize();frame=requestAnimationFrame(animate);}catch(error){canvas.remove();hero.classList.add('hero-pigment-fallback');console.error('Hero pigment animation unavailable',error);}
+  }).catch(error=>{canvas.remove();hero.classList.add('hero-pigment-fallback');console.error('Hero pigment animation unavailable',error);});
 }());
