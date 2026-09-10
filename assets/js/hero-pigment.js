@@ -8,8 +8,8 @@
     mobileCount: 9000,
     reducedMotionCount: 2500,
     clusterCount: 5,
-    pointSizeMin: 0.72,
-    pointSizeMax: 2.35,
+    pointSizeMin: 1.4,
+    pointSizeMax: 6.0,
     flowScale: 3.2,
     flowStrength: 0.34,
     clusterStrength: 0.18,
@@ -29,8 +29,8 @@
     collisionImpulse: 2.15,
     resonanceDuration: 2.15,
     resonanceMaxRadius: 0.58,
-    logoParticleRatio: 0.40,
-    logoAttractionStrength: 0.035,
+    logoParticleRatio: 0.50,
+    logoAttractionStrength: 0.045,
     desktopDprCap: 1.65,
     mobileDprCap: 1.25
   };
@@ -150,6 +150,9 @@
   let lastTime = performance.now();
   let elapsed = 0;
   let visible = !document.hidden;
+  let logoTexture;
+  let logoPoints = [];
+  let collisionEnergy = 0.55;
 
   const random = (min, max) => min + Math.random() * (max - min);
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -172,8 +175,11 @@
     uniform vec2 uMouseVelocity;
     uniform vec4 uCollision;
     uniform vec2 uCollisionGroups;
+    uniform float uCollisionEnergy;
     uniform vec4 uWave;
     uniform float uSanityMode;
+    uniform sampler2D uLogoMask;
+    uniform vec3 uLogoField;
 
     out vec2 vPosition;
     out vec2 vVelocity;
@@ -221,26 +227,19 @@
       velocity += toRibbon * uClusterStrength * (0.35 + smoothstep(0.05,0.7,ribbonDistance)) * uDelta;
       velocity += curlField(position*3.2 + center, aSeed) * uFlowStrength * uDelta;
 
-      // The logo is a low-priority density/flow bias for only 40% of the field.
-      // Inside the mask particles remain free; cohesion appears only near its
-      // boundary or after a particle has travelled well away from the mark.
-      if (fract(aSeed*7.137) < 0.40) {
-        vec2 logoUv = vec2(
-          (position.x-uLogoField.x)*uAspect/uLogoField.y+0.5,
-          (position.y-0.5)/uLogoField.y+0.5
-        );
-        bool inBounds = all(greaterThanEqual(logoUv,vec2(0.0))) && all(lessThanEqual(logoUv,vec2(1.0)));
-        float mask = inBounds ? texture(uLogoMask,logoUv).a : 0.0;
-        vec2 texel = vec2(1.0/420.0);
-        vec2 gradient = vec2(
+      // The mask is a weak density field, never a fixed home position. Half
+      // the particles can drift through it; only its edge and far field steer.
+      if (fract(aSeed*7.137)<0.50) {
+        vec2 logoUv=vec2((position.x-uLogoField.x)*uAspect/uLogoField.y+0.5,(position.y-0.5)/uLogoField.y+0.5);
+        float mask=texture(uLogoMask,logoUv).a;
+        vec2 texel=vec2(1.0/420.0);
+        vec2 gradient=vec2(
           texture(uLogoMask,logoUv+vec2(texel.x,0.0)).a-texture(uLogoMask,logoUv-vec2(texel.x,0.0)).a,
           texture(uLogoMask,logoUv+vec2(0.0,texel.y)).a-texture(uLogoMask,logoUv-vec2(0.0,texel.y)).a
         );
-        gradient.x /= uAspect;
-        float logoDistance = length(vec2((position.x-uLogoField.x)*uAspect,position.y-0.5));
-        velocity += gradient*(1.0-mask)*uLogoField.z*3.0*uDelta;
-        velocity += vec2((uLogoField.x-position.x)/uAspect,0.5-position.y)
-          *smoothstep(0.30,0.72,logoDistance)*uLogoField.z*uDelta;
+        gradient.x/=uAspect;
+        float farField=smoothstep(0.32,0.72,length(vec2((position.x-uLogoField.x)*uAspect,position.y-0.5)));
+        velocity+=(gradient*(1.0-mask)*2.4+vec2((uLogoField.x-position.x)/uAspect,0.5-position.y)*farField)*uLogoField.z*uDelta;
       }
 
       // Mouse is one continuous radial + tangential + dragged wake field.
@@ -253,9 +252,9 @@
         vec2 direction = mouseDistance > 0.0001 ? mouseDelta/mouseDistance : vec2(1.0,0.0);
         vec2 tangentForce = vec2(-direction.y,direction.x);
         float speed = min(length(uMouseVelocity)*8.0,2.2);
-        velocity += direction * (outer*0.34 + inner*1.35) * uDelta;
-        velocity += tangentForce * outer * (0.42 + speed*0.45) * uDelta;
-        velocity += uMouseVelocity * outer * (0.95 + speed) * uDelta;
+        velocity -= direction * (outer*0.48 + inner*0.30) * uDelta;
+        velocity += tangentForce * outer * (0.72 + speed*0.62) * uDelta;
+        velocity += uMouseVelocity * outer * (1.20 + speed*1.15) * uDelta;
       }
 
       // Expanding click ring applies force only near the moving wave front.
@@ -286,11 +285,12 @@
           velocity -= normal*influence*(0.4+phase*0.95)*uDelta;
           velocity += tangentCollision*influence*phase*0.22*uDelta;
         } else if (phase < 2.0) {
-          velocity -= normal*influence*1.42*uDelta;
+          velocity -= normal*influence*(1.42+uCollisionEnergy*0.9)*uDelta;
+          velocity *= 1.0-influence*(0.08+uCollisionEnergy*0.08);
           velocity += tangentCollision*influence*sin(aSeed*31.0)*0.38*uDelta;
         } else if (phase < 3.0) {
-          velocity += normal*influence*2.15*uDelta;
-          velocity += tangentCollision*influence*sin(aSeed*47.0)*1.15*uDelta;
+          velocity += vec2(1.0/uAspect,0.0)*influence*(1.5+uCollisionEnergy)*uDelta;
+          velocity += tangentCollision*influence*sin(aSeed*47.0)*(1.15+uCollisionEnergy*0.7)*uDelta;
         } else {
           float wake = (1.0-(phase-3.0))*influence;
           velocity += tangentCollision*wake*(0.9+0.5*sin(aSeed*23.0))*uDelta;
@@ -316,17 +316,29 @@
     precision mediump float; void main() {}`;
   const RENDER_VERTEX = `#version 300 es
     precision highp float;
-    layout(location=0) in vec2 aPosition; layout(location=1) in vec2 aVelocity;
-    layout(location=2) in float aSeed; layout(location=3) in float aGroup;
-    layout(location=4) in float aKind; layout(location=5) in vec2 aHome;
-    uniform float uAspect,uDpr,uPointMin,uPointMax,uPhase,uEnergy; uniform vec2 uCore; uniform vec3 uPalette[5];
+    layout(location=0) in vec2 aPosition;
+    layout(location=1) in vec2 aVelocity;
+    layout(location=2) in float aSeed;
+    layout(location=3) in float aGroup;
+    uniform float uAspect;
+    uniform float uDpr;
+    uniform float uPointMin;
+    uniform float uPointMax;
+    uniform vec3 uPalette[5];
+    uniform vec4 uCollision;
+    uniform vec2 uCollisionGroups;
+    uniform float uCollisionEnergy;
     out vec4 vColour;
 
     void main() {
       vec2 clip = vec2(aPosition.x*2.0-1.0,1.0-aPosition.y*2.0);
       gl_Position = vec4(clip,0.0,1.0);
       float depth = fract(aSeed*17.731);
-      gl_PointSize = mix(uPointMin,uPointMax,pow(depth,3.1))*uDpr;
+      vec2 coreDelta=aPosition-uCollision.xy;
+      coreDelta.x*=uAspect;
+      float coreInfluence=smoothstep(0.19,0.0,length(coreDelta));
+      float impactPulse=uCollision.z>=2.0&&uCollision.z<3.0 ? 1.0-(uCollision.z-2.0) : 0.0;
+      gl_PointSize = mix(uPointMin,uPointMax,pow(depth,2.6))*uDpr*(1.0+coreInfluence*impactPulse*(0.3+uCollisionEnergy*0.45));
       int groupIndex = int(aGroup+0.5);
       vec3 colour = uPalette[groupIndex];
       float alpha = mix(0.16,0.57,depth);
@@ -343,14 +355,24 @@
         vec3 firstColour = uPalette[int(uCollisionGroups.x+0.5)];
         vec3 secondColour = uPalette[int(uCollisionGroups.y+0.5)];
         vec3 transition = mix(firstColour,secondColour,smoothstep(0.0,1.0,gradientPosition));
-        colour = mix(colour,transition,ribbon*min(1.0,(uCollision.z-0.85)*2.4));
-        alpha += ribbon*0.16;
+        colour = mix(colour,transition,ribbon*min(1.0,(uCollision.z-0.85)*(2.0+uCollisionEnergy)));
+        alpha += ribbon*0.24;
       }
       vColour = vec4(colour,alpha);
     }`;
   const RENDER_FRAGMENT = `#version 300 es
-    precision mediump float; in vec4 vColour; out vec4 outColour;
-    void main(){ vec2 q=gl_PointCoord*2.0-1.0; float r=dot(q,q); if(r>1.0)discard; outColour=vec4(vColour.rgb,vColour.a*smoothstep(1.0,.08,r)); }`;
+    precision mediump float;
+    in vec4 vColour;
+    out vec4 outColour;
+    void main() {
+      vec2 point = gl_PointCoord*2.0-1.0;
+      float radius = dot(point,point);
+      if (radius>1.0) discard;
+      float powderEdge = smoothstep(1.0,0.12,radius);
+      float softCore=smoothstep(0.28,0.0,radius);
+      outColour = vec4(vColour.rgb*(1.0+softCore*0.12),vColour.a*powderEdge);
+    }`;
+
   const BACKGROUND_VERTEX = `#version 300 es
     precision highp float; out vec2 vUv; void main(){ vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);vUv=p;gl_Position=vec4(p*2.0-1.0,0,1);}`;
   const BACKGROUND_FRAGMENT = `#version 300 es
@@ -432,10 +454,11 @@
     backgroundProgram = createProgram(BACKGROUND_VERTEX, BACKGROUND_FRAGMENT);
     updateUniforms = locations(updateProgram, [
       'uTime','uDelta','uAspect','uFlowStrength','uClusterStrength','uDamping',
-      'uCenters[0]','uMouse','uMouseVelocity','uCollision','uCollisionGroups','uWave','uSanityMode'
+      'uCenters[0]','uMouse','uMouseVelocity','uCollision','uCollisionGroups','uWave','uSanityMode',
+      'uLogoMask','uLogoField','uCollisionEnergy'
     ]);
     renderUniforms = locations(renderProgram, [
-      'uAspect','uDpr','uPointMin','uPointMax','uPalette[0]','uCollision','uCollisionGroups'
+      'uAspect','uDpr','uPointMin','uPointMax','uPalette[0]','uCollision','uCollisionGroups','uCollisionEnergy'
     ]);
     backgroundUniforms = locations(backgroundProgram, [
       'uTime','uAspect','uCenters[0]','uPalette[0]','uCollision','uCollisionGroups'
@@ -451,7 +474,7 @@
   }
 
   function createLogoTexture() {
-    logoTexture = gl.createTexture();
+    logoTexture=gl.createTexture();
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D,logoTexture);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
@@ -462,30 +485,24 @@
   }
 
   function loadLogoMask() {
-    const image = new Image();
-    image.onload = () => {
-      const size = 420;
-      const surface = document.createElement('canvas');
-      surface.width = surface.height = size;
-      const context = surface.getContext('2d',{willReadFrequently:true});
-      const scale = Math.min(size/image.naturalWidth,size/image.naturalHeight);
-      const drawWidth = image.naturalWidth*scale;
-      const drawHeight = image.naturalHeight*scale;
+    const image=new Image();
+    image.onload=()=>{
+      const size=420,surface=document.createElement('canvas');
+      surface.width=surface.height=size;
+      const context=surface.getContext('2d',{willReadFrequently:true});
+      const scale=Math.min(size/image.naturalWidth,size/image.naturalHeight);
+      const drawWidth=image.naturalWidth*scale,drawHeight=image.naturalHeight*scale;
       context.drawImage(image,(size-drawWidth)/2,(size-drawHeight)/2,drawWidth,drawHeight);
-      const pixels = context.getImageData(0,0,size,size).data;
-      logoPoints = [];
-      for (let y=0;y<size;y+=2) for (let x=0;x<size;x+=2) {
-        if (pixels[(y*size+x)*4+3]>48) logoPoints.push([x/size,y/size]);
-      }
+      const pixels=context.getImageData(0,0,size,size).data;
+      logoPoints=[];
+      for(let y=0;y<size;y+=2)for(let x=0;x<size;x+=2){if(pixels[(y*size+x)*4+3]>48)logoPoints.push([x/size,y/size]);}
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D,logoTexture);
-      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
       gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,surface);
-      // Re-seed the biased share once; the running engine never waits for the image.
-      if (logoPoints.length) initializeParticles();
+      if(logoPoints.length)initializeParticles();
     };
-    image.onerror = () => console.warn(`Hero logo mask unavailable: ${LOGO_MASK_URL}`);
-    image.src = LOGO_MASK_URL;
+    image.onerror=()=>console.warn(`Hero logo mask unavailable: ${LOGO_MASK_URL}`);
+    image.src=LOGO_MASK_URL;
   }
 
   function makeInitialState(count) {
@@ -501,11 +518,11 @@
       const centerAngle = group/PIGMENT_CONFIG.clusterCount*Math.PI*2-Math.PI/2;
       const centerX = 0.58+Math.cos(centerAngle)*0.265/aspect;
       const centerY = 0.5+Math.sin(centerAngle)*0.27;
-      if (index<count*PIGMENT_CONFIG.logoParticleRatio && logoPoints.length) {
-        const point = logoPoints[Math.floor(Math.random()*logoPoints.length)];
-        positions[index*2] = (mobileQuery.matches ? 0.57 : 0.69)+(point[0]-0.5)*0.55/aspect+random(-0.008,0.008)/aspect;
-        positions[index*2+1] = 0.5+(point[1]-0.5)*0.55+random(-0.008,0.008);
-      } else {
+      if(index<count*PIGMENT_CONFIG.logoParticleRatio&&logoPoints.length){
+        const point=logoPoints[Math.floor(Math.random()*logoPoints.length)];
+        positions[index*2]=(mobileQuery.matches?0.57:0.69)+(point[0]-.5)*.55/aspect+random(-.01,.01)/aspect;
+        positions[index*2+1]=.5+(point[1]-.5)*.55+random(-.01,.01);
+      }else{
         positions[index*2] = centerX + Math.cos(angle)*random(0.015,0.17)/aspect + Math.cos(centerAngle)*ribbon*0.14;
         positions[index*2+1] = centerY + Math.sin(angle)*random(0.012,0.105) + Math.sin(centerAngle)*ribbon*0.11;
       }
@@ -617,9 +634,7 @@
   }
 
   function collisionPoint(centers) {
-    const a = fieldCollision.first*2;
-    const b = fieldCollision.second*2;
-    return [(centers[a]+centers[b])*0.5,(centers[a+1]+centers[b+1])*0.5];
+    return [mobileQuery.matches?0.57:0.69,0.5];
   }
 
   function setInteractionUniforms(uniforms, centers, collisionPhase) {
@@ -644,6 +659,11 @@
     gl.uniform2f(updateUniforms.uMouseVelocity,pointer.vx,pointer.vy);
     gl.uniform4f(updateUniforms.uWave,resonance.x,resonance.y,resonance.age,PIGMENT_CONFIG.resonanceDuration);
     gl.uniform1f(updateUniforms.uSanityMode,SANITY_MODE ? 1 : 0);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D,logoTexture);
+    gl.uniform1i(updateUniforms.uLogoMask,0);
+    gl.uniform3f(updateUniforms.uLogoField,mobileQuery.matches?0.57:0.69,0.55,PIGMENT_CONFIG.logoAttractionStrength);
+    gl.uniform1f(updateUniforms.uCollisionEnergy,collisionEnergy);
     setInteractionUniforms(updateUniforms,centers,collisionPhase);
     gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,0,target.position);
     gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,1,target.velocity);
@@ -675,6 +695,7 @@
     gl.uniform1f(renderUniforms.uDpr,dpr);
     gl.uniform1f(renderUniforms.uPointMin,PIGMENT_CONFIG.pointSizeMin);
     gl.uniform1f(renderUniforms.uPointMax,PIGMENT_CONFIG.pointSizeMax);
+    gl.uniform1f(renderUniforms.uCollisionEnergy,collisionEnergy);
     setPalette(renderUniforms['uPalette[0]']);
     setInteractionUniforms(renderUniforms,centers,collisionPhase);
     gl.drawArrays(gl.POINTS,0,particleCount);
@@ -694,6 +715,7 @@
     drawParticles(centers,collisionPhase);
     pointer.vx *= 0.82;
     pointer.vy *= 0.82;
+    collisionEnergy += (0.55-collisionEnergy)*Math.min(1,rawDelta*0.7);
     animationFrame = requestAnimationFrame(animate);
   }
 
@@ -717,6 +739,15 @@
     pointer.x = pointer.previousX = position[0];
     pointer.y = pointer.previousY = position[1];
     pointer.active = 1;
+    const coreX=mobileQuery.matches?0.57:0.69;
+    const coreDistance=Math.hypot((position[0]-coreX)*aspect,position[1]-.5);
+    const speed=Math.hypot(pointer.vx*aspect,pointer.vy);
+    if(coreDistance<.3)collisionEnergy=Math.max(collisionEnergy,.75);
+    if(coreDistance<PIGMENT_CONFIG.collisionRadius&&speed>.018){
+      collisionEnergy=1;
+      fieldCollision.age=PIGMENT_CONFIG.approachDuration+PIGMENT_CONFIG.compressionDuration;
+      fieldCollision.active=true;
+    }
   },{passive:true});
   hero.addEventListener('pointerleave',() => { pointer.active = 0; },{passive:true});
   hero.addEventListener('pointerdown',(event) => {
@@ -756,55 +787,6 @@
   } catch (error) {
     hero.classList.add('hero-pigment-fallback');
     startMovingFallback(canvas,error);
-  }
-  function logoGeometry(kind){
-    const collection=kind===0?logoMask.edge:logoMask.inside;
-    const sample=collection[Math.floor(Math.random()*collection.length)];
-    // Keep the PNG's own proportions; aspect correction only maps it into screen space.
-    const centerX=mobileQuery.matches?.57:.69, logoHeight=.61, logoWidth=.61/aspect;
-    return [centerX+(sample[0]-.5)*logoWidth,.5+(sample[1]-.5)*logoHeight];
-  }
-  function makeState(n){
-    const positions=new Float32Array(n*2), velocities=new Float32Array(n*2), seeds=new Float32Array(n), groups=new Float32Array(n), kinds=new Float32Array(n), homes=new Float32Array(n*2);
-    const skeletonEnd=Math.floor(n*CONFIG.skeletonRatio), flowEnd=Math.floor(n*(CONFIG.skeletonRatio+CONFIG.flowRatio));
-    for(let i=0;i<n;i++){
-      const seed=Math.random(); let kind=i<skeletonEnd?0:(i<flowEnd?1:2), group=2, home;
-      if(kind===0){ home=logoGeometry(0); group=home[1]<.485?0:(home[1]>.515?1:2); }
-      else if(kind===1){ group=i%10<4?0:(i%10<8?1:2); home=logoGeometry(1); }
-      else { group=i%5; home=logoGeometry(i%4===0?0:1); home[0]+=random(-.12,.12)/aspect; home[1]+=random(-.11,.11); }
-      const spread=kind===0?.006:(kind===1?.025:.075); positions[i*2]=home[0]+random(-spread,spread)/aspect; positions[i*2+1]=home[1]+random(-spread,spread);
-      velocities[i*2]=random(-.01,.01); velocities[i*2+1]=random(-.01,.01); homes[i*2]=home[0]; homes[i*2+1]=home[1]; seeds[i]=seed; groups[i]=group; kinds[i]=kind;
-    } return {positions,velocities,seeds,groups,kinds,homes};
-  }
-  function particleSet(pos,vel,shared){
-    const set={position:buffer(pos,gl.DYNAMIC_COPY),velocity:buffer(vel,gl.DYNAMIC_COPY)}, vao=gl.createVertexArray(); set.vao=vao; gl.bindVertexArray(vao);
-    [[0,set.position,2],[1,set.velocity,2],[2,shared.seed,1],[3,shared.group,1],[4,shared.kind,1],[5,shared.home,2]].forEach(a=>{gl.bindBuffer(gl.ARRAY_BUFFER,a[1]);gl.enableVertexAttribArray(a[0]);gl.vertexAttribPointer(a[0],a[2],gl.FLOAT,false,0,0);}); return set;
-  }
-  function initParticles(){
-    sets.forEach(s=>{gl.deleteBuffer(s.position);gl.deleteBuffer(s.velocity);gl.deleteVertexArray(s.vao);}); sets=[];
-    count=reducedQuery.matches?CONFIG.reducedMotionCount:(mobileQuery.matches?CONFIG.mobileCount:CONFIG.desktopCount); const state=makeState(count);
-    const shared={seed:buffer(state.seeds),group:buffer(state.groups),kind:buffer(state.kinds),home:buffer(state.homes)};
-    sets=[particleSet(state.positions,state.velocities,shared),particleSet(state.positions,state.velocities,shared)]; source=0;
-  }
-  function core(){ return [mobileQuery.matches?.57:.69,.50]; }
-  function setCommon(u,phase){ const c=core(); gl.uniform1f(u.uAspect,aspect); gl.uniform1f(u.uPhase,phase); gl.uniform1f(u.uEnergy,collision.energy); gl.uniform2f(u.uCore,c[0],c[1]); }
-  function trigger(energy){ collision.active=true; collision.age=0; collision.energy=clamp(energy,.55,1); }
-  function collisionPhase(dt){
-    collision.next-=dt; if(!collision.active&&collision.next<=0&&!reducedQuery.matches)trigger(.55+Math.random()*.15);
-    if(!collision.active){ collision.energy+=(0.62-collision.energy)*dt; return 0; } collision.age+=dt;
-    const a=CONFIG.approachDuration,b=a+CONFIG.compressionDuration,c=b+CONFIG.impactDuration,d=c+CONFIG.ribbonDuration;
-    if(collision.age<a)return collision.age/a; if(collision.age<b)return 1+(collision.age-a)/CONFIG.compressionDuration; if(collision.age<c)return 2+(collision.age-b)/CONFIG.impactDuration;
-    if(collision.age<d)return 3+(collision.age-c)/CONFIG.ribbonDuration;
-    collision.active=false;collision.next=random(CONFIG.collisionIntervalMin,CONFIG.collisionIntervalMax);return 0;
-  }
-  function update(dt,phase){
-    const a=sets[source],b=sets[1-source]; gl.useProgram(updateProgram);gl.bindVertexArray(a.vao);setCommon(updateU,phase);
-    gl.uniform1f(updateU.uTime,elapsed);gl.uniform1f(updateU.uDelta,dt);gl.uniform4f(updateU.uMouse,pointer.x,pointer.y,pointer.active,.265);gl.uniform2f(updateU.uMouseVelocity,pointer.vx,pointer.vy);
-    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,0,b.position);gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,1,b.velocity);gl.enable(gl.RASTERIZER_DISCARD);gl.beginTransformFeedback(gl.POINTS);gl.drawArrays(gl.POINTS,0,count);gl.endTransformFeedback();gl.disable(gl.RASTERIZER_DISCARD);gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,0,null);gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,1,null);source=1-source;
-  }
-  function draw(phase){
-    gl.disable(gl.BLEND);gl.useProgram(backgroundProgram);gl.bindVertexArray(emptyVao);setCommon(backgroundU,phase);gl.uniform1f(backgroundU.uTime,elapsed);gl.uniform3fv(backgroundU['uPalette[0]'],new Float32Array(PALETTE.flat()));gl.drawArrays(gl.TRIANGLES,0,3);
-    gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.useProgram(renderProgram);gl.bindVertexArray(sets[source].vao);setCommon(renderU,phase);gl.uniform1f(renderU.uDpr,dpr);gl.uniform1f(renderU.uPointMin,CONFIG.pointSizeMin);gl.uniform1f(renderU.uPointMax,CONFIG.pointSizeMax);gl.uniform3fv(renderU['uPalette[0]'],new Float32Array(PALETTE.flat()));gl.drawArrays(gl.POINTS,0,count);
   }
   function resize(){ if(!logoMask)return;const r=hero.getBoundingClientRect();width=Math.max(1,r.width);height=Math.max(1,r.height);aspect=width/height;dpr=Math.min(devicePixelRatio||1,mobileQuery.matches?CONFIG.mobileDprCap:CONFIG.desktopDprCap);canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);canvas.style.width=width+'px';canvas.style.height=height+'px';gl.viewport(0,0,canvas.width,canvas.height);initParticles(); }
   function animate(now){ if(!visible)return;const raw=Math.min(.033,(now-lastTime)/1000||.0167),dt=reducedQuery.matches?raw*.12:raw;lastTime=now;elapsed+=dt;const phase=collisionPhase(raw);update(dt,phase);draw(phase);pointer.vx*=.76;pointer.vy*=.76;frame=requestAnimationFrame(animate); }
