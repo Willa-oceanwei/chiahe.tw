@@ -125,7 +125,7 @@
     out vec4 vColour; out float vGlow;
     void main(){
       gl_Position=vec4(aPosition.x*2.0-1.0,1.0-aPosition.y*2.0,0,1);
-      float distribution=fract(aSeed*17.731), kindSize=aKind<.5?.82:(aKind<1.5?1.05:.78);
+      float distribution=fract(aSeed*17.731), kindSize=aKind<.5?.82:(aKind<1.5?1.05:.42);
       float size=mix(uPointMin,uPointMax,pow(distribution,2.1))*kindSize;
       float d=length(vec2((aPosition.x-uCore.x)*uAspect,aPosition.y-uCore.y));
       float impact=(uPhase>=2.0&&uPhase<3.0)?1.0-(uPhase-2.0):0.0;
@@ -136,7 +136,7 @@
       float newColour=(participant?mixed:0.0)*max(smoothstep(.23,0.0,d),ribbon)*smoothstep(1.72,2.2,uPhase);
       colour=mix(colour,uPalette[4],newColour);
       if(aKind<.5) colour=mix(colour,vec3(.67,.57,.72),.28);
-      float alpha=aKind<.5?mix(.55,.88,distribution):mix(.34,.78,distribution);
+      float alpha=aKind<.5?mix(.55,.88,distribution):(aKind<1.5?mix(.34,.78,distribution):mix(.20,.48,distribution));
       float foreground=smoothstep(.84,.97,fract(aSeed*29.71));
       float shimmer=.68+.32*sin(uTime*1.35+aSeed*41.0);
       vGlow=clamp(foreground*shimmer+newColour*.92+impact*smoothstep(.22,0.0,d)*.58,0.0,1.0);
@@ -210,11 +210,23 @@
     const positions=new Float32Array(n*2), velocities=new Float32Array(n*2), seeds=new Float32Array(n), groups=new Float32Array(n), kinds=new Float32Array(n), homes=new Float32Array(n*2);
     const skeletonEnd=Math.floor(n*CONFIG.skeletonRatio), flowEnd=Math.floor(n*(CONFIG.skeletonRatio+CONFIG.flowRatio));
     for(let i=0;i<n;i++){
-      const seed=Math.random(); let kind=i<skeletonEnd?0:(i<flowEnd?1:2), group=2, home;
+      const seed=Math.random(); let kind=i<skeletonEnd?0:(i<flowEnd?1:2), group=2, home, ring=false;
       if(kind===0){ home=logoGeometry(0); group=home[1]<.485?0:(home[1]>.515?1:2); }
       else if(kind===1){ group=i%10<4?0:(i%10<8?1:2); home=logoGeometry(1); }
-      else { group=i%5; home=logoGeometry(i%4===0?0:1); home[0]+=random(-.12,.12)/aspect; home[1]+=random(-.11,.11); }
-      const spread=kind===0?.006:(kind===1?.025:.075); positions[i*2]=home[0]+random(-spread,spread)/aspect; positions[i*2+1]=home[1]+random(-spread,spread);
+      else {
+        group=i%5;
+        if(i%10<7){
+          ring=true;
+          // A fine, breathing powder orbit frames the denser Logo without
+          // reading as a hard geometric stroke.
+          const angle=seed*Math.PI*2, radius=random(.315,.36);
+          home=[(mobileQuery.matches?.57:.69)+Math.cos(angle)*radius/aspect,.5+Math.sin(angle)*radius];
+        }else{
+          home=logoGeometry(i%4===0?0:1);
+          home[0]+=random(-.12,.12)/aspect; home[1]+=random(-.11,.11);
+        }
+      }
+      const spread=kind===0?.006:(kind===1?.025:(ring?.018:.075)); positions[i*2]=home[0]+random(-spread,spread)/aspect; positions[i*2+1]=home[1]+random(-spread,spread);
       velocities[i*2]=random(-.01,.01); velocities[i*2+1]=random(-.01,.01); homes[i*2]=home[0]; homes[i*2+1]=home[1]; seeds[i]=seed; groups[i]=group; kinds[i]=kind;
     } return {positions,velocities,seeds,groups,kinds,homes};
   }
