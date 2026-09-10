@@ -4,11 +4,11 @@
   'use strict';
 
   const CONFIG = {
-    desktopCount: 20000, mobileCount: 8000, reducedMotionCount: 2800,
-    skeletonRatio: 0.42, flowRatio: 0.30, freeRatio: 0.28,
-    pointSizeMin: 1.35, pointSizeMax: 6.8,
-    approachDuration: 1.18, compressionDuration: 0.42, impactDuration: 0.32,
-    ribbonDuration: 3.6, reformDuration: 4.2,
+    desktopCount: 30000, mobileCount: 12000, reducedMotionCount: 3600,
+    skeletonRatio: 0.50, flowRatio: 0.36, freeRatio: 0.14,
+    pointSizeMin: 1.45, pointSizeMax: 7.6,
+    approachDuration: 1.32, compressionDuration: 0.48, impactDuration: 0.38,
+    ribbonDuration: 4.6, reformDuration: 4.6,
     collisionIntervalMin: 4.8, collisionIntervalMax: 7.4,
     collisionRadius: 0.145, desktopDprCap: 1.65, mobileDprCap: 1.25
   };
@@ -16,7 +16,7 @@
     [0.12, 0.72, 0.78], [0.88, 0.24, 0.56], [0.96, 0.70, 0.18],
     [0.96, 0.40, 0.17], [0.57, 0.25, 0.92]
   ];
-  const LOGO_MASK_URL = 'chiahe_logo_transparent.png';
+  const LOGO_MASK_URL = 'images/chiahe-logo-symbol.png';
   window.HERO_PIGMENT_CONFIG = CONFIG;
   window.HERO_PIGMENT_PALETTE = PALETTE;
 
@@ -60,20 +60,21 @@
       bool skeleton=aKind<.5, internal=aKind>.5&&aKind<1.5;
       float reform=phase>3.0 ? smoothstep(3.0,4.0,phase) : 0.0;
 
-      // Forty-two percent of particles remain a legible, breathing outline.
+      // Half of all particles remain a legible, breathing outline.
       if(skeleton){
-        v += toHome*(2.9+reform*2.4)*uDelta;
-        v += curl(p*2.0,aSeed)*.018*uDelta;
+        float breath=.93+.07*sin(uTime*1.15+aSeed*9.0);
+        v += toHome*(3.7+reform*2.8)*uDelta;
+        v += curl(p*2.0,aSeed)*(.026+.012*breath)*uDelta;
         v *= pow(.91,uDelta*60.0);
       } else if(internal){
-        v += toHome*(.88+reform*1.5)*uDelta;
-        vec2 tangent = aGroup<.5 ? normalize(vec2(-toHome.y,toHome.x)) :
-                       aGroup<1.5 ? normalize(vec2(toHome.y,-toHome.x)) : vec2(1.0,0.0);
-        v += tangent*(.11+.05*sin(aSeed*31.0+uTime))*uDelta;
-        v += curl(p*2.6,aSeed)*.055*uDelta;
+        v += toHome*(1.12+reform*1.8)*uDelta;
+        vec2 orbit=metric(p-uCore); vec2 tangent=normalize(vec2(-orbit.y,orbit.x)+vec2(.001)); tangent.x/=uAspect;
+        if(aGroup>1.5)tangent=normalize(vec2(1.0,.12*sin(aSeed*19.0+uTime)));
+        v += tangent*(.19+.09*sin(aSeed*31.0+uTime*1.3))*uDelta;
+        v += curl(p*2.8,aSeed)*.085*uDelta;
       } else {
         v += toHome*(.20+reform*.75)*uDelta;
-        v += curl(p*2.1,aSeed)*.075*uDelta;
+        v += curl(p*2.1,aSeed)*.105*uDelta;
       }
 
       bool stream=aGroup<1.5;
@@ -82,21 +83,21 @@
         toward.x/=uAspect;
         float local=smoothstep(.42,0.0,dist);
         if(phase<1.0){ // approach: both continuous colour bands visibly converge
-          v += toward*(.48+phase*.78)*uEnergy*local*uDelta;
+          v += toward*(.68+phase*1.05)*uEnergy*local*uDelta;
         } else if(phase<2.0){ // narrow, slow, dense compression at the brand core
-          v += toward*2.7*uEnergy*local*uDelta;
-          v *= 1.0-local*(.12+.13*uEnergy);
+          v += toward*3.65*uEnergy*local*uDelta;
+          v *= 1.0-local*(.17+.16*uEnergy);
         } else if(phase<3.0){ // arrow-led release, tangential shear, small shock
           vec2 normal=normalize(metric(p-uCore)+vec2(.0001)); normal.x/=uAspect;
           float impact=1.0-(phase-2.0);
-          float mixed=step(fract(aSeed*37.17),mix(.18,.30,uEnergy));
-          v += vec2(2.15+.9*uEnergy,(aSeed-.5)*.58)*local*impact*mixed*uDelta;
-          v += vec2(-normal.y,normal.x)*sin(aSeed*49.0)*1.25*local*impact*uDelta;
-          v += normal*.38*local*impact*uDelta;
+          float mixed=step(fract(aSeed*37.17),mix(.27,.44,uEnergy));
+          v += vec2(2.85+1.25*uEnergy,(aSeed-.5)*.72)*local*impact*mixed*uDelta;
+          v += vec2(-normal.y,normal.x)*sin(aSeed*49.0)*1.65*local*impact*uDelta;
+          v += normal*.52*local*impact*uDelta;
         } else { // long mixed ribbon keeps travelling along the arrow
-          float mixed=step(fract(aSeed*37.17),mix(.18,.30,uEnergy));
+          float mixed=step(fract(aSeed*37.17),mix(.27,.44,uEnergy));
           float ribbonLife=1.0-smoothstep(3.0,4.0,phase);
-          v += vec2(.32, sin(aSeed*41.0)*.025)*mixed*ribbonLife*uDelta;
+          v += vec2(.46, sin(aSeed*41.0)*.04)*mixed*ribbonLife*uDelta;
         }
       }
 
@@ -104,11 +105,14 @@
       if(uMouse.z>.5){
         vec2 dm=metric(uMouse.xy-p); float md=length(dm); vec2 towardMouse=md>.001?dm/md:vec2(0); towardMouse.x/=uAspect;
         float reach=smoothstep(uMouse.w,0.0,md);
-        v += towardMouse*reach*.34*uDelta;
+        vec2 mouseTangent=vec2(-towardMouse.y,towardMouse.x);
+        float mouseSpeed=min(length(metric(uMouseVelocity))*12.0,1.0);
+        v += towardMouse*reach*(.52+.34*mouseSpeed)*uDelta;
+        v += mouseTangent*reach*(.30+.58*mouseSpeed)*sin(aSeed*17.0)*uDelta;
         vec2 dc=metric(uCore-p); float cd=length(dc); vec2 towardCore=cd>.001?dc/cd:vec2(0); towardCore.x/=uAspect;
         float logoMouse=smoothstep(.34,0.0,length(metric(uMouse.xy-uCore)));
-        v += towardCore*reach*logoMouse*.48*uDelta;
-        v += uMouseVelocity*reach*.42*uDelta;
+        v += towardCore*reach*logoMouse*.78*uDelta;
+        v += uMouseVelocity*reach*(.66+mouseSpeed)*uDelta;
       }
       v*=pow(skeleton?.986:.991,uDelta*60.0); v=clamp(v,vec2(-1.7),vec2(1.7)); p+=v*uDelta;
       if(p.x<-.08||p.x>1.13||p.y<-.1||p.y>1.1){ p=mix(p,aHome,.065); v*=.65; }
@@ -125,23 +129,24 @@
     out vec4 vColour;
     void main(){
       gl_Position=vec4(aPosition.x*2.0-1.0,1.0-aPosition.y*2.0,0,1);
-      float distribution=fract(aSeed*17.731), kindSize=aKind<.5?.82:(aKind<1.5?1.05:.78);
+      float distribution=fract(aSeed*17.731), depth=fract(aSeed*53.73), kindSize=aKind<.5?.88:(aKind<1.5?1.08:.74);
       float size=mix(uPointMin,uPointMax,pow(distribution,2.1))*kindSize;
       float d=length(vec2((aPosition.x-uCore.x)*uAspect,aPosition.y-uCore.y));
       float impact=(uPhase>=2.0&&uPhase<3.0)?1.0-(uPhase-2.0):0.0;
-      size*=1.0+smoothstep(.18,0.0,d)*impact*mix(.3,.8,uEnergy);
+      size*=mix(.70,1.24,depth)*(1.0+smoothstep(.19,0.0,d)*impact*mix(.48,1.0,uEnergy));
       int group=int(aGroup+.5); vec3 colour=uPalette[group];
-      bool participant=aGroup<1.5; float mixed=step(fract(aSeed*37.17),mix(.18,.30,uEnergy));
-      float ribbon=uPhase>1.72 ? smoothstep(.24,0.0,abs(aPosition.y-uCore.y))*step(uCore.x-.04,aPosition.x) : 0.0;
+      bool participant=aGroup<1.5; float mixed=step(fract(aSeed*37.17),mix(.27,.44,uEnergy));
+      float ribbon=uPhase>1.72 ? smoothstep(.28,0.0,abs(aPosition.y-uCore.y))*step(uCore.x-.04,aPosition.x) : 0.0;
       float newColour=(participant?mixed:0.0)*max(smoothstep(.23,0.0,d),ribbon)*smoothstep(1.72,2.2,uPhase);
       colour=mix(colour,uPalette[4],newColour);
       if(aKind<.5) colour=mix(colour,vec3(.67,.57,.72),.28);
-      float alpha=aKind<.5?mix(.48,.78,distribution):mix(.30,.72,distribution);
-      alpha+=newColour*.18; gl_PointSize=size*uDpr*(1.0+newColour*.18); vColour=vec4(colour,alpha);
+      float alpha=aKind<.5?mix(.58,.88,distribution):mix(.34,.78,distribution);
+      alpha*=mix(.55,1.0,depth); alpha+=newColour*.24+impact*smoothstep(.2,0.0,d)*.14;
+      gl_PointSize=size*uDpr*(1.0+newColour*.28); vColour=vec4(colour,alpha);
     }`;
   const RENDER_FRAGMENT = `#version 300 es
     precision mediump float; in vec4 vColour; out vec4 outColour;
-    void main(){ vec2 q=gl_PointCoord*2.0-1.0; float r=dot(q,q); if(r>1.0)discard; outColour=vec4(vColour.rgb,vColour.a*smoothstep(1.0,.08,r)); }`;
+    void main(){ vec2 q=gl_PointCoord*2.0-1.0; float r=dot(q,q); if(r>1.0)discard; float halo=smoothstep(1.0,.02,r); float core=smoothstep(.26,0.0,r); outColour=vec4(vColour.rgb*(1.0+core*.20),vColour.a*(halo*.66+core*.34)); }`;
   const BACKGROUND_VERTEX = `#version 300 es
     precision highp float; out vec2 vUv; void main(){ vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);vUv=p;gl_Position=vec4(p*2.0-1.0,0,1);}`;
   const BACKGROUND_FRAGMENT = `#version 300 es
@@ -149,11 +154,19 @@
     void main(){
       vec3 c=mix(vec3(.055,.085,.205),vec3(.14,.075,.24),vUv.x*.62+vUv.y*.18);
       vec2 q=vec2((vUv.x-uCore.x)*uAspect,vUv.y-uCore.y);
-      float logoFog=smoothstep(.48,.04,length(q))*0.07; c=mix(c,mix(uPalette[0],uPalette[1],vUv.y),logoFog);
+      float breathing=.5+.5*sin(uTime*.34);
+      float cloudA=smoothstep(.48,.025,length(q+vec2(.055*sin(uTime*.12),-.045*cos(uTime*.16))));
+      float cloudB=smoothstep(.34,.015,length(q*vec2(.72,1.18)-vec2(.09,-.08)));
+      float filaments=.5+.5*sin(q.x*19.0-q.y*14.0+uTime*.28);
+      float logoFog=cloudA*(.075+.025*breathing)+cloudB*.045+cloudA*filaments*.025;
+      c=mix(c,mix(uPalette[0],uPalette[1],smoothstep(-.24,.24,q.y)),logoFog);
+      float warmHaze=smoothstep(.31,.0,length(q-vec2(-.10,.13)))*(.025+.018*sin(uTime*.23+1.2));
+      c=mix(c,uPalette[2],warmHaze);
       // Fog follows particle impact by about 160 ms (the latter half of phase 2).
       float delayed=smoothstep(2.50,2.82,uPhase)*(1.0-smoothstep(3.55,4.0,uPhase));
-      vec2 trail=q-vec2(max(q.x,0.0)*.34,0); float fog=smoothstep(.30,.0,length(trail))*delayed*(.18+.14*uEnergy);
-      c=mix(c,uPalette[4],fog); outColour=vec4(c,1);
+      vec2 trail=q-vec2(max(q.x,0.0)*.34,0); float fog=smoothstep(.34,.0,length(trail))*delayed*(.25+.18*uEnergy);
+      float coreGlow=smoothstep(.16,.0,length(q))*smoothstep(1.45,2.15,uPhase)*(1.0-smoothstep(3.2,3.8,uPhase));
+      c=mix(c,uPalette[4],fog); c+=uPalette[4]*coreGlow*(.08+.11*uEnergy); outColour=vec4(c,1);
     }`;
 
   function shader(type, source) { const s=gl.createShader(type); gl.shaderSource(s,source); gl.compileShader(s); if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
