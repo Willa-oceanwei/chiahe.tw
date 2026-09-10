@@ -1,5 +1,5 @@
-/* GPU pigment field for the home-page hero. WebGL2 transform feedback keeps all
- * per-particle integration on the GPU; the CPU only updates interaction fields. */
+/* Chia-He logo pigment story. Particle integration stays on the GPU while the
+ * CPU supplies the fixed logo geometry, collision phase, and pointer energy. */
 (function () {
   'use strict';
 
@@ -34,13 +34,9 @@
     desktopDprCap: 1.65,
     mobileDprCap: 1.25
   };
-
   const PALETTE = [
-    [0.153, 0.694, 0.733], // cyan pigment
-    [0.792, 0.298, 0.537], // magenta pigment
-    [0.894, 0.722, 0.263], // yellow pigment
-    [0.878, 0.439, 0.286], // orange pigment
-    [0.455, 0.361, 0.643]  // violet pigment
+    [0.12, 0.72, 0.78], [0.88, 0.24, 0.56], [0.96, 0.70, 0.18],
+    [0.96, 0.40, 0.17], [0.57, 0.25, 0.92]
   ];
   const LOGO_MASK_URL = 'images/chiahe_logo_transparent.png?v=20260910-3';
 
@@ -316,15 +312,19 @@
         }
       }
 
-      velocity *= pow(uDamping,uDelta*60.0);
-      velocity = clamp(velocity,vec2(-1.8),vec2(1.8));
-      position += velocity*uDelta;
-      if (position.x < -0.12) position.x = 1.12;
-      if (position.x > 1.12) position.x = -0.12;
-      if (position.y < -0.12) position.y = 1.12;
-      if (position.y > 1.12) position.y = -0.12;
-      vPosition = position;
-      vVelocity = velocity;
+      // Pointer attracts and stirs; near the logo it guides pigment into core.
+      if(uMouse.z>.5){
+        vec2 dm=metric(uMouse.xy-p); float md=length(dm); vec2 towardMouse=md>.001?dm/md:vec2(0); towardMouse.x/=uAspect;
+        float reach=smoothstep(uMouse.w,0.0,md);
+        v += towardMouse*reach*.34*uDelta;
+        vec2 dc=metric(uCore-p); float cd=length(dc); vec2 towardCore=cd>.001?dc/cd:vec2(0); towardCore.x/=uAspect;
+        float logoMouse=smoothstep(.34,0.0,length(metric(uMouse.xy-uCore)));
+        v += towardCore*reach*logoMouse*.48*uDelta;
+        v += uMouseVelocity*reach*.42*uDelta;
+      }
+      v*=pow(skeleton?.986:.991,uDelta*60.0); v=clamp(v,vec2(-1.7),vec2(1.7)); p+=v*uDelta;
+      if(p.x<-.08||p.x>1.13||p.y<-.1||p.y>1.1){ p=mix(p,aHome,.065); v*=.65; }
+      vPosition=p; vVelocity=v;
     }`;
 
   const PASS_FRAGMENT = `#version 300 es
@@ -378,7 +378,6 @@
       }
       vColour = vec4(colour,alpha);
     }`;
-
   const RENDER_FRAGMENT = `#version 300 es
     precision mediump float;
     in vec4 vColour;
@@ -393,14 +392,7 @@
     }`;
 
   const BACKGROUND_VERTEX = `#version 300 es
-    precision highp float;
-    out vec2 vUv;
-    void main() {
-      vec2 position = vec2((gl_VertexID<<1)&2,gl_VertexID&2);
-      vUv = position;
-      gl_Position = vec4(position*2.0-1.0,0.0,1.0);
-    }`;
-
+    precision highp float; out vec2 vUv; void main(){ vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);vUv=p;gl_Position=vec4(p*2.0-1.0,0,1);}`;
   const BACKGROUND_FRAGMENT = `#version 300 es
     precision highp float;
     in vec2 vUv;
@@ -798,6 +790,13 @@
   }
 
   try {
+    if (SANITY_MODE) {
+      const badge = document.createElement('div');
+      badge.textContent = 'HERO SANITY ACTIVE';
+      badge.setAttribute('aria-live','polite');
+      badge.style.cssText = 'position:absolute;right:12px;bottom:12px;z-index:3;padding:6px 9px;background:#111827;color:#fff;font:600 11px/1.2 monospace;letter-spacing:.08em;border:1px solid rgba(255,255,255,.45);border-radius:3px;pointer-events:none';
+      hero.appendChild(badge);
+    }
     initializePrograms();
     createLogoTexture();
     resize();
@@ -808,4 +807,16 @@
     hero.classList.add('hero-pigment-fallback');
     startMovingFallback(canvas,error);
   }
+  function resize(){ if(!logoMask)return;const r=hero.getBoundingClientRect();width=Math.max(1,r.width);height=Math.max(1,r.height);aspect=width/height;dpr=Math.min(devicePixelRatio||1,mobileQuery.matches?CONFIG.mobileDprCap:CONFIG.desktopDprCap);canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);canvas.style.width=width+'px';canvas.style.height=height+'px';gl.viewport(0,0,canvas.width,canvas.height);initParticles(); }
+  function animate(now){ if(!visible)return;const raw=Math.min(.033,(now-lastTime)/1000||.0167),dt=reducedQuery.matches?raw*.12:raw;lastTime=now;elapsed+=dt;const phase=collisionPhase(raw);update(dt,phase);draw(phase);pointer.vx*=.76;pointer.vy*=.76;frame=requestAnimationFrame(animate); }
+  function pointerPosition(e){const r=hero.getBoundingClientRect();return[(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height];}
+  hero.addEventListener('pointerenter',e=>{if(e.pointerType==='touch')return;const p=pointerPosition(e);pointer.x=pointer.px=p[0];pointer.y=pointer.py=p[1];pointer.active=1;},{passive:true});
+  hero.addEventListener('pointermove',e=>{if(e.pointerType==='touch')return;const p=pointerPosition(e),dx=p[0]-pointer.px,dy=p[1]-pointer.py,speed=Math.hypot(dx*aspect,dy),c=core();pointer.vx=clamp(dx,-.1,.1);pointer.vy=clamp(dy,-.1,.1);pointer.x=pointer.px=p[0];pointer.y=pointer.py=p[1];pointer.active=1;const near=Math.hypot((p[0]-c[0])*aspect,p[1]-c[1]);if(near<.31)collision.energy=Math.max(collision.energy,.75);if(near<CONFIG.collisionRadius&&speed>.022)trigger(1);},{passive:true});
+  hero.addEventListener('pointerleave',()=>{pointer.active=0;},{passive:true});
+  document.addEventListener('visibilitychange',()=>{visible=!document.hidden;cancelAnimationFrame(frame);if(visible){lastTime=performance.now();frame=requestAnimationFrame(animate);}});
+  addEventListener('resize',resize,{passive:true});if(mobileQuery.addEventListener){mobileQuery.addEventListener('change',resize);reducedQuery.addEventListener('change',resize);}
+  loadLogoMask().then(mask=>{
+    logoMask=mask;
+    try{initPrograms();resize();frame=requestAnimationFrame(animate);}catch(error){canvas.remove();hero.classList.add('hero-pigment-fallback');console.error('Hero pigment animation unavailable',error);}
+  }).catch(error=>{canvas.remove();hero.classList.add('hero-pigment-fallback');console.error('Hero pigment animation unavailable',error);});
 }());
