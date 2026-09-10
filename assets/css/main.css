@@ -3893,6 +3893,46 @@ input, select, textarea {
 			z-index: 0;
 		}
 
+		#intro .hero-brand {
+			position: absolute;
+			top: 2rem;
+			left: 5rem;
+			z-index: 3;
+			display: flex;
+			flex-direction: column;
+			align-items: flex-start;
+			gap: 0.28rem;
+			max-width: calc(100% - 10rem);
+			color: rgba(255, 255, 255, 0.94);
+			text-shadow: 0 1px 12px rgba(8, 10, 35, 0.28);
+			pointer-events: none;
+		}
+
+		#intro .hero-brand__name {
+			font-size: 1rem;
+			font-weight: 550;
+			letter-spacing: 0.06em;
+			line-height: 1.35;
+		}
+
+		#intro .hero-brand__name-en {
+			font-size: 0.625rem;
+			font-weight: 400;
+			letter-spacing: 0.21em;
+			line-height: 1.4;
+			opacity: 0.64;
+			white-space: nowrap;
+		}
+
+		@media screen and (max-width: 1680px) {
+
+			#intro .hero-brand {
+				left: 4rem;
+				max-width: calc(100% - 8rem);
+			}
+
+		}
+
 		#intro .hero-copy {
 			position: relative;
 			z-index: 2;
@@ -3987,6 +4027,22 @@ input, select, textarea {
 			}
 
 			@media screen and (max-width: 736px), screen and (hover: none) and (pointer: coarse) {
+
+				#intro .hero-brand {
+					top: 1.5rem;
+					left: 1.5rem;
+					max-width: calc(100% - 3rem);
+					gap: 0.2rem;
+				}
+
+				#intro .hero-brand__name {
+					font-size: 0.875rem;
+				}
+
+				#intro .hero-brand__name-en {
+					font-size: 0.525rem;
+					letter-spacing: 0.18em;
+				}
 
 				#intro .hero-copy {
 					width: 100%;
