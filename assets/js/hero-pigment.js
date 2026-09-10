@@ -31,7 +31,8 @@
   const gl = canvas.getContext('webgl2', { alpha: false, antialias: false, depth: false, powerPreference: 'high-performance' });
   if (!gl) { canvas.remove(); hero.classList.add('hero-pigment-fallback'); return; }
 
-  const mobileQuery = matchMedia('(max-width: 736px)');
+  // Cover narrow viewports and touch-first phones in landscape orientation.
+  const mobileQuery = matchMedia('(max-width: 736px), (hover: none) and (pointer: coarse)');
   const reducedQuery = matchMedia('(prefers-reduced-motion: reduce)');
   const pointer = { x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, active: 0 };
   const collision = { age: 99, next: 2.2, active: false, energy: 0.62 };
