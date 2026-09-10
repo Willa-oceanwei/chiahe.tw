@@ -246,9 +246,191 @@
     gl.uniform1f(updateU.uTime,elapsed);gl.uniform1f(updateU.uDelta,dt);gl.uniform4f(updateU.uMouse,pointer.x,pointer.y,pointer.active,.265);gl.uniform2f(updateU.uMouseVelocity,pointer.vx,pointer.vy);
     gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,0,b.position);gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,1,b.velocity);gl.enable(gl.RASTERIZER_DISCARD);gl.beginTransformFeedback(gl.POINTS);gl.drawArrays(gl.POINTS,0,count);gl.endTransformFeedback();gl.disable(gl.RASTERIZER_DISCARD);gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,0,null);gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,1,null);source=1-source;
   }
-  function draw(phase){
-    gl.disable(gl.BLEND);gl.useProgram(backgroundProgram);gl.bindVertexArray(emptyVao);setCommon(backgroundU,phase);gl.uniform1f(backgroundU.uTime,elapsed);gl.uniform3fv(backgroundU['uPalette[0]'],new Float32Array(PALETTE.flat()));gl.drawArrays(gl.TRIANGLES,0,3);
-    gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.useProgram(renderProgram);gl.bindVertexArray(sets[source].vao);setCommon(renderU,phase);gl.uniform1f(renderU.uDpr,dpr);gl.uniform1f(renderU.uPointMin,CONFIG.pointSizeMin);gl.uniform1f(renderU.uPointMax,CONFIG.pointSizeMax);gl.uniform3fv(renderU['uPalette[0]'],new Float32Array(PALETTE.flat()));gl.drawArrays(gl.POINTS,0,count);
+
+  function updateCollision(delta) {
+    fieldCollision.next -= delta;
+    if (!fieldCollision.active && fieldCollision.next<=0 && !reducedQuery.matches) {
+      fieldCollision.first = Math.floor(Math.random()*5);
+      fieldCollision.second = (fieldCollision.first+1+Math.floor(Math.random()*4))%5;
+      fieldCollision.age = 0;
+      fieldCollision.active = true;
+    }
+    if (!fieldCollision.active) return 0;
+    fieldCollision.age += delta;
+    const approach = PIGMENT_CONFIG.approachDuration;
+    const compression = approach+PIGMENT_CONFIG.compressionDuration;
+    const impact = compression+PIGMENT_CONFIG.impactDuration;
+    const total = impact+PIGMENT_CONFIG.wakeDuration;
+    if (fieldCollision.age<approach) return fieldCollision.age/approach;
+    if (fieldCollision.age<compression) return 1+(fieldCollision.age-approach)/PIGMENT_CONFIG.compressionDuration;
+    if (fieldCollision.age<impact) return 2+(fieldCollision.age-compression)/PIGMENT_CONFIG.impactDuration;
+    if (fieldCollision.age<total) return 3+(fieldCollision.age-impact)/PIGMENT_CONFIG.wakeDuration;
+    fieldCollision.active = false;
+    fieldCollision.next = random(PIGMENT_CONFIG.collisionIntervalMin,PIGMENT_CONFIG.collisionIntervalMax);
+    return 0;
+  }
+
+  function collisionPoint(centers) {
+    const a = fieldCollision.first*2;
+    const b = fieldCollision.second*2;
+    return [(centers[a]+centers[b])*0.5,(centers[a+1]+centers[b+1])*0.5];
+  }
+
+  function setInteractionUniforms(uniforms, centers, collisionPhase) {
+    const contact = collisionPoint(centers);
+    gl.uniform1f(uniforms.uAspect,aspect);
+    if (uniforms['uCenters[0]']) gl.uniform2fv(uniforms['uCenters[0]'],centers);
+    if (uniforms.uCollision) gl.uniform4f(uniforms.uCollision,contact[0],contact[1],collisionPhase,PIGMENT_CONFIG.collisionRadius);
+    if (uniforms.uCollisionGroups) gl.uniform2f(uniforms.uCollisionGroups,fieldCollision.first,fieldCollision.second);
+  }
+
+  function updateParticles(delta, centers, collisionPhase) {
+    const source = particleSets[sourceIndex];
+    const target = particleSets[1-sourceIndex];
+    if (source.position===target.position || source.velocity===target.velocity) {
+      throw new Error('Hero pigment transform-feedback buffers are aliased');
+    }
+    gl.useProgram(updateProgram);
+    gl.bindVertexArray(source.vao);
+    gl.uniform1f(updateUniforms.uTime,elapsed);
+    gl.uniform1f(updateUniforms.uDelta,delta);
+    gl.uniform1f(updateUniforms.uFlowStrength,reducedQuery.matches ? 0.055 : (mobileQuery.matches ? 0.25 : PIGMENT_CONFIG.flowStrength));
+    gl.uniform1f(updateUniforms.uClusterStrength,PIGMENT_CONFIG.clusterStrength);
+    gl.uniform1f(updateUniforms.uDamping,PIGMENT_CONFIG.damping);
+    gl.uniform4f(updateUniforms.uMouse,pointer.x,pointer.y,pointer.active,PIGMENT_CONFIG.mouseOuterRadius);
+    gl.uniform2f(updateUniforms.uMouseVelocity,pointer.vx,pointer.vy);
+    gl.uniform4f(updateUniforms.uMouseForces,PIGMENT_CONFIG.mouseRadialForce,PIGMENT_CONFIG.mouseSwirlForce,PIGMENT_CONFIG.mouseWakeForce,PIGMENT_CONFIG.mouseAttractionForce);
+    gl.uniform4f(updateUniforms.uWave,resonance.x,resonance.y,resonance.age,PIGMENT_CONFIG.resonanceDuration);
+    gl.uniform1f(updateUniforms.uDebugMotion,GPU_SANITY_MOTION ? 1 : 0);
+    setInteractionUniforms(updateUniforms,centers,collisionPhase);
+    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,0,target.position);
+    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,1,target.velocity);
+    debugGlError('bindBufferBase');
+    gl.enable(gl.RASTERIZER_DISCARD);
+    gl.beginTransformFeedback(gl.POINTS);
+    debugGlError('beginTransformFeedback');
+    gl.drawArrays(gl.POINTS,0,particleCount);
+    debugGlError('drawArrays');
+    gl.endTransformFeedback();
+    debugGlError('endTransformFeedback');
+    gl.disable(gl.RASTERIZER_DISCARD);
+    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,0,null);
+    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER,1,null);
+    sourceIndex = 1-sourceIndex;
+    debugReadback();
+  }
+
+  function drawBackground(centers, collisionPhase) {
+    gl.disable(gl.BLEND);
+    gl.useProgram(backgroundProgram);
+    gl.bindVertexArray(emptyVao);
+    gl.uniform1f(backgroundUniforms.uTime,elapsed);
+    setPalette(backgroundUniforms['uPalette[0]']);
+    setInteractionUniforms(backgroundUniforms,centers,collisionPhase);
+    gl.drawArrays(gl.TRIANGLES,0,3);
+  }
+
+  function drawParticles(centers, collisionPhase) {
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+    gl.useProgram(renderProgram);
+    gl.bindVertexArray(particleSets[sourceIndex].vao);
+    gl.uniform1f(renderUniforms.uDpr,dpr);
+    gl.uniform1f(renderUniforms.uPointMin,PIGMENT_CONFIG.pointSizeMin);
+    gl.uniform1f(renderUniforms.uPointMax,PIGMENT_CONFIG.pointSizeMax);
+    setPalette(renderUniforms['uPalette[0]']);
+    setInteractionUniforms(renderUniforms,centers,collisionPhase);
+    gl.drawArrays(gl.POINTS,0,particleCount);
+    debugGlError('render draw');
+  }
+
+  function animate(time) {
+    if (!visible) return;
+    const rawDelta = Math.min(0.033,(time-lastTime)/1000||0.0167);
+    const delta = reducedQuery.matches ? rawDelta*0.16 : rawDelta;
+    lastTime = time;
+    elapsed += delta;
+    frameCount += 1;
+    resonance.age += rawDelta;
+    const collisionPhase = updateCollision(rawDelta);
+    currentCenters = clusterCenters(elapsed);
+    updateParticles(delta,currentCenters,collisionPhase);
+    drawBackground(currentCenters,collisionPhase);
+    drawParticles(currentCenters,collisionPhase);
+    pointer.vx *= 0.82;
+    pointer.vy *= 0.82;
+    if (DEBUG_GPU_MOTION && frameCount%120===0) {
+      console.debug('Hero pigment animation frame', { frame: frameCount, elapsed, delta, sourceIndex });
+    }
+    animationFrame = requestAnimationFrame(animate);
+  }
+
+  function pointerPosition(event) {
+    const rect = hero.getBoundingClientRect();
+    return [(event.clientX-rect.left)/rect.width,(event.clientY-rect.top)/rect.height];
+  }
+
+  hero.addEventListener('pointerenter',(event) => {
+    if (event.pointerType==='touch') return;
+    const position = pointerPosition(event);
+    pointer.x = pointer.previousX = position[0];
+    pointer.y = pointer.previousY = position[1];
+    pointer.active = 1;
+  },{passive:true});
+  hero.addEventListener('pointermove',(event) => {
+    if (event.pointerType==='touch') return;
+    const position = pointerPosition(event);
+    pointer.vx = clamp(position[0]-pointer.previousX,-0.08,0.08);
+    pointer.vy = clamp(position[1]-pointer.previousY,-0.08,0.08);
+    pointer.x = pointer.previousX = position[0];
+    pointer.y = pointer.previousY = position[1];
+    pointer.active = 1;
+  },{passive:true});
+  hero.addEventListener('pointerleave',() => { pointer.active = 0; },{passive:true});
+  hero.addEventListener('pointerdown',(event) => {
+    if (reducedQuery.matches) return;
+    const position = pointerPosition(event);
+    resonance.x = position[0];
+    resonance.y = position[1];
+    resonance.age = 0;
+  },{passive:true});
+  canvas.addEventListener('webglcontextlost',(event) => {
+    event.preventDefault();
+    visible = false;
+    cancelAnimationFrame(animationFrame);
+    console.warn('Hero pigment WebGL context lost');
+  });
+  canvas.addEventListener('webglcontextrestored',() => {
+    console.info('Hero pigment WebGL context restored');
+    particleSets = [];
+    initializePrograms();
+    resize();
+    visible = !document.hidden;
+    lastTime = performance.now();
+    if (visible) animationFrame = requestAnimationFrame(animate);
+  });
+  document.addEventListener('visibilitychange',() => {
+    visible = !document.hidden;
+    cancelAnimationFrame(animationFrame);
+    if (visible) {
+      lastTime = performance.now();
+      animationFrame = requestAnimationFrame(animate);
+    }
+  });
+  window.addEventListener('resize',resize,{passive:true});
+  if (mobileQuery.addEventListener) {
+    mobileQuery.addEventListener('change',resize);
+    reducedQuery.addEventListener('change',resize);
+  }
+
+  try {
+    initializePrograms();
+    resize();
+    animationFrame = requestAnimationFrame(animate);
+  } catch (error) {
+    canvas.remove();
+    hero.classList.add('hero-pigment-fallback');
+    console.error(error);
   }
   function resize(){ if(!logoMask)return;const r=hero.getBoundingClientRect();width=Math.max(1,r.width);height=Math.max(1,r.height);aspect=width/height;dpr=Math.min(devicePixelRatio||1,mobileQuery.matches?CONFIG.mobileDprCap:CONFIG.desktopDprCap);canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);canvas.style.width=width+'px';canvas.style.height=height+'px';gl.viewport(0,0,canvas.width,canvas.height);initParticles(); }
   function animate(now){ if(!visible)return;const raw=Math.min(.033,(now-lastTime)/1000||.0167),dt=reducedQuery.matches?raw*.12:raw;lastTime=now;elapsed+=dt;const phase=collisionPhase(raw);update(dt,phase);draw(phase);pointer.vx*=.76;pointer.vy*=.76;frame=requestAnimationFrame(animate); }
