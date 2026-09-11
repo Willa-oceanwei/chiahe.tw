@@ -213,7 +213,7 @@
         else {
           // Preserve extra edge density around the central symbol's right-hand
           // closure, using only contours that actually exist in the PNG mask.
-          const closure=edge.filter(point=>point[0]>.46&&point[0]<.72&&point[1]>.34&&point[1]<.66);
+          const closure=edge.filter(point=>point[0]>.46&&point[1]>.32&&point[1]<.68);
           resolve({inside,edge,closure:closure.length>12?closure:edge});
         }
       };
@@ -233,7 +233,7 @@
     const skeletonEnd=Math.floor(n*CONFIG.skeletonRatio), flowEnd=Math.floor(n*(CONFIG.skeletonRatio+CONFIG.flowRatio));
     for(let i=0;i<n;i++){
       const seed=Math.random(); let kind=i<skeletonEnd?0:(i<flowEnd?1:2), group=2, home, ring=false;
-      if(kind===0){ home=logoGeometry(i%2===0?3:0); group=home[1]<.485?0:(home[1]>.515?1:2); }
+      if(kind===0){ home=logoGeometry(i%4===0?3:0); group=home[1]<.485?0:(home[1]>.515?1:2); }
       else if(kind===1){ group=i%10<4?0:(i%10<8?1:2); home=logoGeometry(1); }
       else {
         group=i%5;
