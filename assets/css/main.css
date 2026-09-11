@@ -3893,6 +3893,127 @@ input, select, textarea {
 			z-index: 0;
 		}
 
+		#intro .hero-brand {
+			position: absolute;
+			top: 2rem;
+			left: 5rem;
+			z-index: 3;
+			display: flex;
+			flex-direction: column;
+			align-items: flex-start;
+			gap: 0.28rem;
+			max-width: calc(100% - 10rem);
+			color: rgba(255, 255, 255, 0.94);
+			text-shadow: 0 1px 12px rgba(8, 10, 35, 0.28);
+			pointer-events: none;
+		}
+
+		#intro .hero-brand__name {
+			font-size: 1rem;
+			font-weight: 550;
+			letter-spacing: 0.06em;
+			line-height: 1.35;
+		}
+
+		#intro .hero-brand__name-en {
+			font-size: 0.625rem;
+			font-weight: 400;
+			letter-spacing: 0.21em;
+			line-height: 1.4;
+			opacity: 0.64;
+			white-space: nowrap;
+		}
+
+		@media screen and (max-width: 1680px) {
+
+			#intro .hero-brand {
+				left: 4rem;
+				max-width: calc(100% - 8rem);
+			}
+
+		}
+
+		#intro .hero-copy {
+			position: relative;
+			z-index: 2;
+			align-self: flex-end;
+			width: min(46vw, 600px);
+			max-width: none;
+			margin-left: 0;
+			margin-right: auto;
+			padding-top: 7rem;
+			padding-bottom: clamp(3rem, 8vh, 6rem);
+		}
+
+		#intro .hero-copy__header,
+		#intro .hero-copy__body,
+		#intro .hero-copy__signature {
+			margin: 0;
+		}
+
+		#intro .hero-copy__eyebrow {
+			margin: 0 0 0.3rem;
+			font-size: 0.68rem;
+			font-weight: 600;
+			letter-spacing: 0.32em;
+			line-height: 1.4;
+			color: #d9b75f;
+		}
+
+		#intro .hero-copy__kicker {
+			margin: 0;
+			font-size: clamp(0.95rem, 1.35vw, 1.15rem);
+			font-weight: 400;
+			letter-spacing: 0.1em;
+			color: #d9b75f;
+		}
+
+		#intro .hero-copy__title {
+			margin: clamp(1.3rem, 3vh, 2.2rem) 0 1.5rem;
+			font-size: clamp(2.65rem, 4.8vw, 4.9rem);
+			font-weight: 600;
+			letter-spacing: -0.045em;
+			line-height: 1.04;
+		}
+
+		#intro .hero-copy__title span {
+			display: block;
+			white-space: nowrap;
+		}
+
+		#intro .hero-copy__title span:nth-child(2) {
+			transform: translateX(clamp(0.7rem, 3.5vw, 3.2rem));
+		}
+
+		#intro .hero-copy__title span:nth-child(3) {
+			transform: translateX(clamp(0.15rem, 1.2vw, 1rem));
+		}
+
+		#intro .hero-copy__body {
+			max-width: 500px;
+			font-size: clamp(0.9rem, 1.15vw, 1.05rem);
+			line-height: 1.9;
+		}
+
+		#intro .hero-copy__signature {
+			display: flex;
+			flex-direction: column;
+			gap: 0.25rem;
+			margin-top: clamp(1.8rem, 4vh, 3.25rem);
+			font-size: 0.68rem;
+			letter-spacing: 0.16em;
+			line-height: 1.5;
+			text-transform: uppercase;
+		}
+
+		#intro .hero-copy__signature strong {
+			font-weight: 600;
+		}
+
+		#intro .hero-copy__signature span {
+			opacity: 0.68;
+		}
+
 		#intro p {
 			font-size: 1.25em;
 		}
@@ -3905,7 +4026,46 @@ input, select, textarea {
 
 			}
 
-			@media screen and (max-width: 736px) {
+			@media screen and (max-width: 736px), screen and (hover: none) and (pointer: coarse) {
+
+				#intro .hero-brand {
+					top: 1.5rem;
+					left: 1.5rem;
+					max-width: calc(100% - 3rem);
+					gap: 0.2rem;
+				}
+
+				#intro .hero-brand__name {
+					font-size: 0.875rem;
+				}
+
+				#intro .hero-brand__name-en {
+					font-size: 0.525rem;
+					letter-spacing: 0.18em;
+				}
+
+				#intro .hero-copy {
+					width: 100%;
+					padding: 6rem 1.5rem 2.5rem;
+				}
+
+				#intro .hero-copy__title {
+					font-size: clamp(2.25rem, 11vw, 3.4rem);
+					letter-spacing: -0.05em;
+				}
+
+				#intro .hero-copy__title span:nth-child(2) {
+					transform: translateX(0.5rem);
+				}
+
+				#intro .hero-copy__title span:nth-child(3) {
+					transform: none;
+				}
+
+				#intro .hero-copy__body {
+					font-size: 0.86rem;
+					line-height: 1.75;
+				}
 
 				#intro p {
 					font-size: 1em;
