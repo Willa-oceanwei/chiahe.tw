@@ -210,14 +210,19 @@
           if(!opaque(x-2,y)||!opaque(x+2,y)||!opaque(x,y-2)||!opaque(x,y+2))edge.push(point);
         }
         if(edge.length<40||inside.length<100)reject(new Error('Logo mask has insufficient opaque pixels'));
-        else resolve({inside,edge});
+        else {
+          // Preserve extra edge density around the central symbol's right-hand
+          // closure, using only contours that actually exist in the PNG mask.
+          const closure=edge.filter(point=>point[0]>.46&&point[1]>.32&&point[1]<.68);
+          resolve({inside,edge,closure:closure.length>12?closure:edge});
+        }
       };
       image.onerror=()=>reject(new Error(`Unable to load Hero logo mask: ${LOGO_MASK_URL}`));
       image.src=LOGO_MASK_URL;
     });
   }
   function logoGeometry(kind){
-    const collection=kind===0?logoMask.edge:logoMask.inside;
+    const collection=kind===0?logoMask.edge:(kind===3?logoMask.closure:logoMask.inside);
     const sample=collection[Math.floor(Math.random()*collection.length)];
     // Keep the PNG's own proportions; aspect correction only maps it into screen space.
     const centerX=mobileQuery.matches?.57:.69, logoHeight=.61, logoWidth=.61/aspect;
@@ -228,7 +233,7 @@
     const skeletonEnd=Math.floor(n*CONFIG.skeletonRatio), flowEnd=Math.floor(n*(CONFIG.skeletonRatio+CONFIG.flowRatio));
     for(let i=0;i<n;i++){
       const seed=Math.random(); let kind=i<skeletonEnd?0:(i<flowEnd?1:2), group=2, home, ring=false;
-      if(kind===0){ home=logoGeometry(0); group=home[1]<.485?0:(home[1]>.515?1:2); }
+      if(kind===0){ home=logoGeometry(i%4===0?3:0); group=home[1]<.485?0:(home[1]>.515?1:2); }
       else if(kind===1){ group=i%10<4?0:(i%10<8?1:2); home=logoGeometry(1); }
       else {
         group=i%5;
