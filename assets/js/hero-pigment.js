@@ -12,7 +12,8 @@
     approachDuration: 1.28, compressionDuration: 0.48, impactDuration: 0.38,
     ribbonDuration: 4.4, reformDuration: 4.2,
     collisionIntervalMin: 4.8, collisionIntervalMax: 7.4,
-    collisionRadius: 0.145, desktopDprCap: 1.65, mobileDprCap: 1.25
+    collisionRadius: 0.145, desktopDprCap: 1.65, mobileDprCap: 1.25,
+    mobilePointScale: 1.35
   };
   const PALETTE = [
     [0.06, 0.86, 0.96], [1.00, 0.14, 0.58], [1.00, 0.78, 0.16],
@@ -225,8 +226,8 @@
     const collection=kind===0?logoMask.edge:(kind===3?logoMask.closure:logoMask.inside);
     const sample=collection[Math.floor(Math.random()*collection.length)];
     // Keep the PNG's own proportions; aspect correction only maps it into screen space.
-    const centerX=mobileQuery.matches?.57:.69, logoHeight=.61, logoWidth=.61/aspect;
-    return [centerX+(sample[0]-.5)*logoWidth,.5+(sample[1]-.5)*logoHeight];
+    const centerX=mobileQuery.matches?.60:.69, centerY=mobileQuery.matches?.57:.50, logoHeight=.61, logoWidth=.61/aspect;
+    return [centerX+(sample[0]-.5)*logoWidth,centerY+(sample[1]-.5)*logoHeight];
   }
   function makeState(n){
     const positions=new Float32Array(n*2), velocities=new Float32Array(n*2), seeds=new Float32Array(n), groups=new Float32Array(n), kinds=new Float32Array(n), homes=new Float32Array(n*2);
@@ -243,7 +244,7 @@
           // A fine, breathing powder orbit frames the denser Logo without
           // reading as a hard geometric stroke.
           const angle=seed*Math.PI*2, radius=random(.32,.385);
-          home=[(mobileQuery.matches?.57:.69)+Math.cos(angle)*radius/aspect,.5+Math.sin(angle)*radius];
+          home=[(mobileQuery.matches?.60:.69)+Math.cos(angle)*radius/aspect,(mobileQuery.matches?.57:.50)+Math.sin(angle)*radius];
         }else{
           home=logoGeometry(i%4===0?0:1);
           home[0]+=random(-.12,.12)/aspect; home[1]+=random(-.11,.11);
@@ -263,7 +264,7 @@
     const shared={seed:buffer(state.seeds),group:buffer(state.groups),kind:buffer(state.kinds),home:buffer(state.homes)};
     sets=[particleSet(state.positions,state.velocities,shared),particleSet(state.positions,state.velocities,shared)]; source=0;
   }
-  function core(){ return [mobileQuery.matches?.57:.69,.50]; }
+  function core(){ return [mobileQuery.matches?.60:.69,mobileQuery.matches?.57:.50]; }
   function setCommon(u,phase){ const c=core(); gl.uniform1f(u.uAspect,aspect); gl.uniform1f(u.uPhase,phase); gl.uniform1f(u.uEnergy,collision.energy); gl.uniform2f(u.uCore,c[0],c[1]); }
   function trigger(energy){ collision.active=true; collision.age=0; collision.energy=clamp(energy,.55,1); }
   function collisionPhase(dt){
@@ -281,7 +282,7 @@
   }
   function draw(phase){
     gl.disable(gl.BLEND);gl.useProgram(backgroundProgram);gl.bindVertexArray(emptyVao);setCommon(backgroundU,phase);gl.uniform1f(backgroundU.uTime,elapsed);gl.uniform3fv(backgroundU['uPalette[0]'],new Float32Array(PALETTE.flat()));gl.drawArrays(gl.TRIANGLES,0,3);
-    gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.useProgram(renderProgram);gl.bindVertexArray(sets[source].vao);setCommon(renderU,phase);gl.uniform1f(renderU.uDpr,dpr);gl.uniform1f(renderU.uPointMin,CONFIG.pointSizeMin);gl.uniform1f(renderU.uPointMax,CONFIG.pointSizeMax);gl.uniform1f(renderU.uTime,elapsed);gl.uniform3fv(renderU['uPalette[0]'],new Float32Array(PALETTE.flat()));gl.drawArrays(gl.POINTS,0,count);
+    gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.useProgram(renderProgram);gl.bindVertexArray(sets[source].vao);setCommon(renderU,phase);gl.uniform1f(renderU.uDpr,dpr*(mobileQuery.matches?CONFIG.mobilePointScale:1));gl.uniform1f(renderU.uPointMin,CONFIG.pointSizeMin);gl.uniform1f(renderU.uPointMax,CONFIG.pointSizeMax);gl.uniform1f(renderU.uTime,elapsed);gl.uniform3fv(renderU['uPalette[0]'],new Float32Array(PALETTE.flat()));gl.drawArrays(gl.POINTS,0,count);
   }
   function resize(){ if(!logoMask)return;const r=hero.getBoundingClientRect(),nextWidth=Math.max(1,r.width),nextHeight=Math.max(1,r.height),nextDpr=Math.min(devicePixelRatio||1,mobileQuery.matches?CONFIG.mobileDprCap:CONFIG.desktopDprCap),nextCount=mobileQuery.matches?CONFIG.mobileCount:(reducedQuery.matches?CONFIG.reducedMotionCount:CONFIG.desktopCount);if(Math.abs(nextWidth-width)<1&&Math.abs(nextHeight-height)<1&&nextDpr===dpr&&nextCount===count)return;width=nextWidth;height=nextHeight;aspect=width/height;dpr=nextDpr;canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);canvas.style.width=width+'px';canvas.style.height=height+'px';gl.viewport(0,0,canvas.width,canvas.height);initParticles(); }
   function queueResize(){clearTimeout(resizeTimer);resizeTimer=setTimeout(resize,150);}
