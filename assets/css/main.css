@@ -3875,6 +3875,13 @@ input, select, textarea {
 		}
 
 /* Intro */
+	.mobile-copy {
+		display: none;
+	}
+
+	.mobile-view-toggle {
+		display: none;
+	}
 
 	#intro {
 		background-attachment: fixed;
@@ -4080,3 +4087,217 @@ input, select, textarea {
 			}
 
 		}
+
+	/* Phone and small-tablet content is deliberately shorter; desktop markup and
+	   presentation above remain untouched. */
+	@media screen and (max-width: 768px) {
+		.desktop-copy {
+			display: none !important;
+		}
+
+		.mobile-copy {
+			display: block;
+		}
+
+		.mobile-view-toggle {
+			position: absolute;
+			right: 1rem;
+			bottom: 1rem;
+			z-index: 4;
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+			margin: 0;
+			font-size: 0.68rem;
+			font-weight: 500;
+			letter-spacing: 0.08em;
+			color: rgba(255, 255, 255, 0.78);
+			cursor: pointer;
+		}
+
+		.mobile-view-toggle input {
+			position: absolute;
+			opacity: 0;
+			pointer-events: none;
+		}
+
+		.mobile-view-toggle__track {
+			position: relative;
+			width: 2.5rem;
+			height: 1.35rem;
+			border: 1px solid rgba(255, 255, 255, 0.38);
+			border-radius: 1rem;
+			background: rgba(9, 12, 48, 0.58);
+			box-shadow: 0 0 12px rgba(30, 211, 245, 0.12);
+		}
+
+		.mobile-view-toggle__track:after {
+			position: absolute;
+			top: 0.16rem;
+			left: 0.16rem;
+			width: 0.9rem;
+			height: 0.9rem;
+			border-radius: 50%;
+			background: #ffffff;
+			box-shadow: 0 0 8px rgba(30, 211, 245, 0.75);
+			content: '';
+			transition: transform 0.2s ease;
+		}
+
+		.mobile-view-toggle input:checked + .mobile-view-toggle__track {
+			border-color: rgba(30, 211, 245, 0.75);
+			background: rgba(94, 66, 166, 0.82);
+		}
+
+		.mobile-view-toggle input:checked + .mobile-view-toggle__track:after {
+			transform: translateX(1.12rem);
+		}
+
+		.mobile-view-toggle input:focus-visible + .mobile-view-toggle__track {
+			outline: 2px solid #ffffff;
+			outline-offset: 3px;
+		}
+
+		body.mobile-desktop-view .desktop-copy {
+			display: block !important;
+		}
+
+		body.mobile-desktop-view .mobile-copy {
+			display: none !important;
+		}
+
+		body.mobile-desktop-view #intro.wrapper.fullscreen {
+			min-height: 100vh;
+		}
+
+		body.mobile-desktop-view #intro .hero-copy {
+			width: min(82%, 30rem);
+			padding-top: 6.5rem;
+		}
+
+		body.mobile-desktop-view #intro .hero-copy__title {
+			font-size: clamp(2rem, 9vw, 3rem);
+		}
+
+		#intro.wrapper.fullscreen {
+			min-height: 75vh;
+			height: auto;
+		}
+
+		@supports (min-height: 75svh) {
+			#intro.wrapper.fullscreen {
+				min-height: 75svh;
+			}
+		}
+
+		#intro .hero-brand {
+			top: 1.25rem;
+			left: 50%;
+			align-items: center;
+			max-width: calc(100% - 2.5rem);
+			transform: translateX(-50%);
+			text-align: center;
+		}
+
+		#intro .hero-brand__name-en {
+			display: none;
+		}
+
+		#intro .hero-copy {
+			align-self: flex-start;
+			width: min(68%, 18rem);
+			margin: 0;
+			padding: 6.5rem 0 2.5rem 1rem;
+			text-align: left;
+		}
+
+		@supports (padding-top: 13svh) {
+			#intro .hero-copy {
+				padding-top: clamp(6rem, 13svh, 7.25rem);
+			}
+		}
+
+		#intro .hero-copy__title--mobile {
+			max-width: 7.5em;
+			margin: 0;
+			font-size: clamp(1.7rem, 7.6vw, 2.75rem);
+			font-weight: 600;
+			letter-spacing: -0.035em;
+			line-height: 1.42;
+			text-wrap: balance;
+		}
+
+		#intro .hero-copy__title--mobile span {
+			display: block;
+			white-space: nowrap;
+		}
+
+		#intro .hero-copy__title--mobile span:nth-child(2) {
+			transform: translateX(0.7rem);
+		}
+
+		#intro .hero-copy__title--mobile span:nth-child(3) {
+			transform: translateX(0.15rem);
+		}
+
+		#intro .hero-copy__products {
+			margin: 1.25rem 0 0;
+			font-size: 0.62rem;
+			letter-spacing: 0.055em;
+			line-height: 1.5;
+			opacity: 0.78;
+			white-space: nowrap;
+		}
+
+		#one > .inner,
+		#two > .inner {
+			display: block !important;
+			padding-top: 3.5rem;
+			padding-bottom: 3.5rem;
+		}
+
+		#one .spotlight-image,
+		#two .spotlight-image {
+			margin-bottom: 1.75rem;
+		}
+
+		#one h2,
+		#two h2 {
+			margin-bottom: 0.85rem;
+		}
+
+		.mobile-summary {
+			margin: 0;
+			font-size: 0.95rem;
+			line-height: 1.65;
+		}
+
+		.mobile-services > div + div {
+			margin-top: 1.15rem;
+		}
+
+		.mobile-services h3,
+		.mobile-services p {
+			margin: 0;
+		}
+
+		.mobile-services h3 {
+			font-size: 1rem;
+		}
+
+		.mobile-services p {
+			font-size: 0.9rem;
+			line-height: 1.5;
+			opacity: 0.86;
+		}
+
+		#three > .inner {
+			padding-top: 3.5rem;
+			padding-bottom: 3.5rem;
+		}
+
+		#three .split.style1 section {
+			padding-top: 2rem;
+			padding-bottom: 2rem;
+		}
+	}
