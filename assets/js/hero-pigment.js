@@ -4,7 +4,7 @@
   'use strict';
 
   const CONFIG = {
-    desktopCount: 60000, mobileCount: 24000, reducedMotionCount: 8400,
+    desktopCount: 60000, mobileCount: 4500, reducedMotionCount: 8400,
     // Keep the original absolute Logo counts; the added capacity belongs to
     // the fine outer orbit (roughly eight times its previous population).
     skeletonRatio: 0.14, flowRatio: 0.10, freeRatio: 0.76,
@@ -12,7 +12,8 @@
     approachDuration: 1.28, compressionDuration: 0.48, impactDuration: 0.38,
     ribbonDuration: 4.4, reformDuration: 4.2,
     collisionIntervalMin: 4.8, collisionIntervalMax: 7.4,
-    collisionRadius: 0.145, desktopDprCap: 1.65, mobileDprCap: 1.25
+    collisionRadius: 0.145, desktopDprCap: 1.65, mobileDprCap: 1.25,
+    mobilePointScale: 1.35
   };
   const PALETTE = [
     [0.06, 0.86, 0.96], [1.00, 0.14, 0.58], [1.00, 0.78, 0.16],
@@ -32,13 +33,13 @@
   if (!gl) { canvas.remove(); hero.classList.add('hero-pigment-fallback'); return; }
 
   // Cover narrow viewports and touch-first phones in landscape orientation.
-  const mobileQuery = matchMedia('(max-width: 736px), (hover: none) and (pointer: coarse)');
+  const mobileQuery = matchMedia('(max-width: 768px), (hover: none) and (pointer: coarse)');
   const reducedQuery = matchMedia('(prefers-reduced-motion: reduce)');
   const pointer = { x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, active: 0 };
   const collision = { age: 99, next: 2.2, active: false, energy: 0.62 };
   let width = 1, height = 1, aspect = 1, dpr = 1, count = 0, source = 0;
   let sets = [], updateProgram, renderProgram, backgroundProgram, updateU, renderU, backgroundU, emptyVao;
-  let frame = 0, lastTime = performance.now(), elapsed = 0, visible = !document.hidden, logoMask;
+  let frame = 0, lastTime = performance.now(), elapsed = 0, pageVisible = !document.hidden, heroVisible = true, logoMask, resizeTimer;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const random = (a, b) => a + Math.random() * (b - a);
 
@@ -225,8 +226,8 @@
     const collection=kind===0?logoMask.edge:(kind===3?logoMask.closure:logoMask.inside);
     const sample=collection[Math.floor(Math.random()*collection.length)];
     // Keep the PNG's own proportions; aspect correction only maps it into screen space.
-    const centerX=mobileQuery.matches?.57:.69, logoHeight=.61, logoWidth=.61/aspect;
-    return [centerX+(sample[0]-.5)*logoWidth,.5+(sample[1]-.5)*logoHeight];
+    const centerX=mobileQuery.matches?.60:.69, centerY=mobileQuery.matches?.57:.50, logoHeight=.61, logoWidth=.61/aspect;
+    return [centerX+(sample[0]-.5)*logoWidth,centerY+(sample[1]-.5)*logoHeight];
   }
   function makeState(n){
     const positions=new Float32Array(n*2), velocities=new Float32Array(n*2), seeds=new Float32Array(n), groups=new Float32Array(n), kinds=new Float32Array(n), homes=new Float32Array(n*2);
@@ -243,7 +244,7 @@
           // A fine, breathing powder orbit frames the denser Logo without
           // reading as a hard geometric stroke.
           const angle=seed*Math.PI*2, radius=random(.32,.385);
-          home=[(mobileQuery.matches?.57:.69)+Math.cos(angle)*radius/aspect,.5+Math.sin(angle)*radius];
+          home=[(mobileQuery.matches?.60:.69)+Math.cos(angle)*radius/aspect,(mobileQuery.matches?.57:.50)+Math.sin(angle)*radius];
         }else{
           home=logoGeometry(i%4===0?0:1);
           home[0]+=random(-.12,.12)/aspect; home[1]+=random(-.11,.11);
@@ -259,11 +260,11 @@
   }
   function initParticles(){
     sets.forEach(s=>{gl.deleteBuffer(s.position);gl.deleteBuffer(s.velocity);gl.deleteVertexArray(s.vao);}); sets=[];
-    count=reducedQuery.matches?CONFIG.reducedMotionCount:(mobileQuery.matches?CONFIG.mobileCount:CONFIG.desktopCount); const state=makeState(count);
+    count=mobileQuery.matches?CONFIG.mobileCount:(reducedQuery.matches?CONFIG.reducedMotionCount:CONFIG.desktopCount); const state=makeState(count);
     const shared={seed:buffer(state.seeds),group:buffer(state.groups),kind:buffer(state.kinds),home:buffer(state.homes)};
     sets=[particleSet(state.positions,state.velocities,shared),particleSet(state.positions,state.velocities,shared)]; source=0;
   }
-  function core(){ return [mobileQuery.matches?.57:.69,.50]; }
+  function core(){ return [mobileQuery.matches?.60:.69,mobileQuery.matches?.57:.50]; }
   function setCommon(u,phase){ const c=core(); gl.uniform1f(u.uAspect,aspect); gl.uniform1f(u.uPhase,phase); gl.uniform1f(u.uEnergy,collision.energy); gl.uniform2f(u.uCore,c[0],c[1]); }
   function trigger(energy){ collision.active=true; collision.age=0; collision.energy=clamp(energy,.55,1); }
   function collisionPhase(dt){
@@ -281,18 +282,23 @@
   }
   function draw(phase){
     gl.disable(gl.BLEND);gl.useProgram(backgroundProgram);gl.bindVertexArray(emptyVao);setCommon(backgroundU,phase);gl.uniform1f(backgroundU.uTime,elapsed);gl.uniform3fv(backgroundU['uPalette[0]'],new Float32Array(PALETTE.flat()));gl.drawArrays(gl.TRIANGLES,0,3);
-    gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.useProgram(renderProgram);gl.bindVertexArray(sets[source].vao);setCommon(renderU,phase);gl.uniform1f(renderU.uDpr,dpr);gl.uniform1f(renderU.uPointMin,CONFIG.pointSizeMin);gl.uniform1f(renderU.uPointMax,CONFIG.pointSizeMax);gl.uniform1f(renderU.uTime,elapsed);gl.uniform3fv(renderU['uPalette[0]'],new Float32Array(PALETTE.flat()));gl.drawArrays(gl.POINTS,0,count);
+    gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.useProgram(renderProgram);gl.bindVertexArray(sets[source].vao);setCommon(renderU,phase);gl.uniform1f(renderU.uDpr,dpr*(mobileQuery.matches?CONFIG.mobilePointScale:1));gl.uniform1f(renderU.uPointMin,CONFIG.pointSizeMin);gl.uniform1f(renderU.uPointMax,CONFIG.pointSizeMax);gl.uniform1f(renderU.uTime,elapsed);gl.uniform3fv(renderU['uPalette[0]'],new Float32Array(PALETTE.flat()));gl.drawArrays(gl.POINTS,0,count);
   }
-  function resize(){ if(!logoMask)return;const r=hero.getBoundingClientRect();width=Math.max(1,r.width);height=Math.max(1,r.height);aspect=width/height;dpr=Math.min(devicePixelRatio||1,mobileQuery.matches?CONFIG.mobileDprCap:CONFIG.desktopDprCap);canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);canvas.style.width=width+'px';canvas.style.height=height+'px';gl.viewport(0,0,canvas.width,canvas.height);initParticles(); }
-  function animate(now){ if(!visible)return;const raw=Math.min(.033,(now-lastTime)/1000||.0167),dt=reducedQuery.matches?raw*.12:raw;lastTime=now;elapsed+=dt;const phase=collisionPhase(raw);update(dt,phase);draw(phase);pointer.vx*=.76;pointer.vy*=.76;frame=requestAnimationFrame(animate); }
+  function resize(){ if(!logoMask)return;const r=hero.getBoundingClientRect(),nextWidth=Math.max(1,r.width),nextHeight=Math.max(1,r.height),nextDpr=Math.min(devicePixelRatio||1,mobileQuery.matches?CONFIG.mobileDprCap:CONFIG.desktopDprCap),nextCount=mobileQuery.matches?CONFIG.mobileCount:(reducedQuery.matches?CONFIG.reducedMotionCount:CONFIG.desktopCount);if(Math.abs(nextWidth-width)<1&&Math.abs(nextHeight-height)<1&&nextDpr===dpr&&nextCount===count)return;width=nextWidth;height=nextHeight;aspect=width/height;dpr=nextDpr;canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);canvas.style.width=width+'px';canvas.style.height=height+'px';gl.viewport(0,0,canvas.width,canvas.height);initParticles(); }
+  function queueResize(){clearTimeout(resizeTimer);resizeTimer=setTimeout(resize,150);}
+  function startAnimation(){if(!pageVisible||!heroVisible||frame)return;lastTime=performance.now();frame=requestAnimationFrame(animate);}
+  function stopAnimation(){cancelAnimationFrame(frame);frame=0;}
+  function animate(now){frame=0;if(!pageVisible||!heroVisible)return;const raw=Math.min(.033,(now-lastTime)/1000||.0167),dt=reducedQuery.matches?raw*.12:raw;lastTime=now;elapsed+=dt;const phase=collisionPhase(raw);update(dt,phase);draw(phase);pointer.vx*=.76;pointer.vy*=.76;frame=requestAnimationFrame(animate); }
   function pointerPosition(e){const r=hero.getBoundingClientRect();return[(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height];}
   hero.addEventListener('pointerenter',e=>{if(e.pointerType==='touch')return;const p=pointerPosition(e);pointer.x=pointer.px=p[0];pointer.y=pointer.py=p[1];pointer.active=1;},{passive:true});
   hero.addEventListener('pointermove',e=>{if(e.pointerType==='touch')return;const p=pointerPosition(e),dx=p[0]-pointer.px,dy=p[1]-pointer.py,speed=Math.hypot(dx*aspect,dy),c=core();pointer.vx=clamp(dx,-.1,.1);pointer.vy=clamp(dy,-.1,.1);pointer.x=pointer.px=p[0];pointer.y=pointer.py=p[1];pointer.active=1;const near=Math.hypot((p[0]-c[0])*aspect,p[1]-c[1]);if(near<.31)collision.energy=Math.max(collision.energy,.75);if(near<CONFIG.collisionRadius&&speed>.022)trigger(1);},{passive:true});
   hero.addEventListener('pointerleave',()=>{pointer.active=0;},{passive:true});
-  document.addEventListener('visibilitychange',()=>{visible=!document.hidden;cancelAnimationFrame(frame);if(visible){lastTime=performance.now();frame=requestAnimationFrame(animate);}});
-  addEventListener('resize',resize,{passive:true});if(mobileQuery.addEventListener){mobileQuery.addEventListener('change',resize);reducedQuery.addEventListener('change',resize);}
+  document.addEventListener('visibilitychange',()=>{pageVisible=!document.hidden;if(pageVisible)startAnimation();else stopAnimation();});
+  const heroObserver='IntersectionObserver' in window?new IntersectionObserver(entries=>{heroVisible=entries[0].isIntersecting;if(heroVisible)startAnimation();else stopAnimation();},{threshold:0}):null;
+  if(heroObserver)heroObserver.observe(hero);
+  addEventListener('resize',queueResize,{passive:true});if(mobileQuery.addEventListener){mobileQuery.addEventListener('change',queueResize);reducedQuery.addEventListener('change',queueResize);}
   loadLogoMask().then(mask=>{
     logoMask=mask;
-    try{initPrograms();resize();frame=requestAnimationFrame(animate);}catch(error){canvas.remove();hero.classList.add('hero-pigment-fallback');console.error('Hero pigment animation unavailable',error);}
+    try{initPrograms();resize();startAnimation();}catch(error){canvas.remove();hero.classList.add('hero-pigment-fallback');console.error('Hero pigment animation unavailable',error);}
   }).catch(error=>{canvas.remove();hero.classList.add('hero-pigment-fallback');console.error('Hero pigment animation unavailable',error);});
 }());
