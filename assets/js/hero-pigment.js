@@ -4,7 +4,7 @@
   'use strict';
 
   const CONFIG = {
-    desktopCount: 60000, mobileCount: 24000, reducedMotionCount: 8400,
+    desktopCount: 60000, mobileCount: 4500, reducedMotionCount: 8400,
     // Keep the original absolute Logo counts; the added capacity belongs to
     // the fine outer orbit (roughly eight times its previous population).
     skeletonRatio: 0.14, flowRatio: 0.10, freeRatio: 0.76,
@@ -32,13 +32,13 @@
   if (!gl) { canvas.remove(); hero.classList.add('hero-pigment-fallback'); return; }
 
   // Cover narrow viewports and touch-first phones in landscape orientation.
-  const mobileQuery = matchMedia('(max-width: 736px), (hover: none) and (pointer: coarse)');
+  const mobileQuery = matchMedia('(max-width: 768px), (hover: none) and (pointer: coarse)');
   const reducedQuery = matchMedia('(prefers-reduced-motion: reduce)');
   const pointer = { x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, active: 0 };
   const collision = { age: 99, next: 2.2, active: false, energy: 0.62 };
   let width = 1, height = 1, aspect = 1, dpr = 1, count = 0, source = 0;
   let sets = [], updateProgram, renderProgram, backgroundProgram, updateU, renderU, backgroundU, emptyVao;
-  let frame = 0, lastTime = performance.now(), elapsed = 0, visible = !document.hidden, logoMask;
+  let frame = 0, lastTime = performance.now(), elapsed = 0, pageVisible = !document.hidden, heroVisible = true, logoMask, resizeTimer;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const random = (a, b) => a + Math.random() * (b - a);
 
@@ -259,7 +259,7 @@
   }
   function initParticles(){
     sets.forEach(s=>{gl.deleteBuffer(s.position);gl.deleteBuffer(s.velocity);gl.deleteVertexArray(s.vao);}); sets=[];
-    count=reducedQuery.matches?CONFIG.reducedMotionCount:(mobileQuery.matches?CONFIG.mobileCount:CONFIG.desktopCount); const state=makeState(count);
+    count=mobileQuery.matches?CONFIG.mobileCount:(reducedQuery.matches?CONFIG.reducedMotionCount:CONFIG.desktopCount); const state=makeState(count);
     const shared={seed:buffer(state.seeds),group:buffer(state.groups),kind:buffer(state.kinds),home:buffer(state.homes)};
     sets=[particleSet(state.positions,state.velocities,shared),particleSet(state.positions,state.velocities,shared)]; source=0;
   }
@@ -283,16 +283,21 @@
     gl.disable(gl.BLEND);gl.useProgram(backgroundProgram);gl.bindVertexArray(emptyVao);setCommon(backgroundU,phase);gl.uniform1f(backgroundU.uTime,elapsed);gl.uniform3fv(backgroundU['uPalette[0]'],new Float32Array(PALETTE.flat()));gl.drawArrays(gl.TRIANGLES,0,3);
     gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.useProgram(renderProgram);gl.bindVertexArray(sets[source].vao);setCommon(renderU,phase);gl.uniform1f(renderU.uDpr,dpr);gl.uniform1f(renderU.uPointMin,CONFIG.pointSizeMin);gl.uniform1f(renderU.uPointMax,CONFIG.pointSizeMax);gl.uniform1f(renderU.uTime,elapsed);gl.uniform3fv(renderU['uPalette[0]'],new Float32Array(PALETTE.flat()));gl.drawArrays(gl.POINTS,0,count);
   }
-  function resize(){ if(!logoMask)return;const r=hero.getBoundingClientRect();width=Math.max(1,r.width);height=Math.max(1,r.height);aspect=width/height;dpr=Math.min(devicePixelRatio||1,mobileQuery.matches?CONFIG.mobileDprCap:CONFIG.desktopDprCap);canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);canvas.style.width=width+'px';canvas.style.height=height+'px';gl.viewport(0,0,canvas.width,canvas.height);initParticles(); }
-  function animate(now){ if(!visible)return;const raw=Math.min(.033,(now-lastTime)/1000||.0167),dt=reducedQuery.matches?raw*.12:raw;lastTime=now;elapsed+=dt;const phase=collisionPhase(raw);update(dt,phase);draw(phase);pointer.vx*=.76;pointer.vy*=.76;frame=requestAnimationFrame(animate); }
+  function resize(){ if(!logoMask)return;const r=hero.getBoundingClientRect(),nextWidth=Math.max(1,r.width),nextHeight=Math.max(1,r.height),nextDpr=Math.min(devicePixelRatio||1,mobileQuery.matches?CONFIG.mobileDprCap:CONFIG.desktopDprCap),nextCount=mobileQuery.matches?CONFIG.mobileCount:(reducedQuery.matches?CONFIG.reducedMotionCount:CONFIG.desktopCount);if(Math.abs(nextWidth-width)<1&&Math.abs(nextHeight-height)<1&&nextDpr===dpr&&nextCount===count)return;width=nextWidth;height=nextHeight;aspect=width/height;dpr=nextDpr;canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);canvas.style.width=width+'px';canvas.style.height=height+'px';gl.viewport(0,0,canvas.width,canvas.height);initParticles(); }
+  function queueResize(){clearTimeout(resizeTimer);resizeTimer=setTimeout(resize,150);}
+  function startAnimation(){if(!pageVisible||!heroVisible||frame)return;lastTime=performance.now();frame=requestAnimationFrame(animate);}
+  function stopAnimation(){cancelAnimationFrame(frame);frame=0;}
+  function animate(now){frame=0;if(!pageVisible||!heroVisible)return;const raw=Math.min(.033,(now-lastTime)/1000||.0167),dt=reducedQuery.matches?raw*.12:raw;lastTime=now;elapsed+=dt;const phase=collisionPhase(raw);update(dt,phase);draw(phase);pointer.vx*=.76;pointer.vy*=.76;frame=requestAnimationFrame(animate); }
   function pointerPosition(e){const r=hero.getBoundingClientRect();return[(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height];}
   hero.addEventListener('pointerenter',e=>{if(e.pointerType==='touch')return;const p=pointerPosition(e);pointer.x=pointer.px=p[0];pointer.y=pointer.py=p[1];pointer.active=1;},{passive:true});
   hero.addEventListener('pointermove',e=>{if(e.pointerType==='touch')return;const p=pointerPosition(e),dx=p[0]-pointer.px,dy=p[1]-pointer.py,speed=Math.hypot(dx*aspect,dy),c=core();pointer.vx=clamp(dx,-.1,.1);pointer.vy=clamp(dy,-.1,.1);pointer.x=pointer.px=p[0];pointer.y=pointer.py=p[1];pointer.active=1;const near=Math.hypot((p[0]-c[0])*aspect,p[1]-c[1]);if(near<.31)collision.energy=Math.max(collision.energy,.75);if(near<CONFIG.collisionRadius&&speed>.022)trigger(1);},{passive:true});
   hero.addEventListener('pointerleave',()=>{pointer.active=0;},{passive:true});
-  document.addEventListener('visibilitychange',()=>{visible=!document.hidden;cancelAnimationFrame(frame);if(visible){lastTime=performance.now();frame=requestAnimationFrame(animate);}});
-  addEventListener('resize',resize,{passive:true});if(mobileQuery.addEventListener){mobileQuery.addEventListener('change',resize);reducedQuery.addEventListener('change',resize);}
+  document.addEventListener('visibilitychange',()=>{pageVisible=!document.hidden;if(pageVisible)startAnimation();else stopAnimation();});
+  const heroObserver='IntersectionObserver' in window?new IntersectionObserver(entries=>{heroVisible=entries[0].isIntersecting;if(heroVisible)startAnimation();else stopAnimation();},{threshold:0}):null;
+  if(heroObserver)heroObserver.observe(hero);
+  addEventListener('resize',queueResize,{passive:true});if(mobileQuery.addEventListener){mobileQuery.addEventListener('change',queueResize);reducedQuery.addEventListener('change',queueResize);}
   loadLogoMask().then(mask=>{
     logoMask=mask;
-    try{initPrograms();resize();frame=requestAnimationFrame(animate);}catch(error){canvas.remove();hero.classList.add('hero-pigment-fallback');console.error('Hero pigment animation unavailable',error);}
+    try{initPrograms();resize();startAnimation();}catch(error){canvas.remove();hero.classList.add('hero-pigment-fallback');console.error('Hero pigment animation unavailable',error);}
   }).catch(error=>{canvas.remove();hero.classList.add('hero-pigment-fallback');console.error('Hero pigment animation unavailable',error);});
 }());
