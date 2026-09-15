@@ -4207,13 +4207,13 @@ input, select, textarea {
 			align-self: flex-start;
 			width: min(68%, 18rem);
 			margin: 0;
-			padding: 8rem 0 2.5rem 1.25rem;
+			padding: 7.25rem 0 2.5rem 1rem;
 			text-align: left;
 		}
 
-		@supports (padding-top: 18svh) {
+		@supports (padding-top: 15svh) {
 			#intro .hero-copy {
-				padding-top: clamp(7.25rem, 18svh, 9.5rem);
+				padding-top: clamp(6.75rem, 15svh, 8rem);
 			}
 		}
 
@@ -4225,6 +4225,19 @@ input, select, textarea {
 			letter-spacing: -0.035em;
 			line-height: 1.3;
 			text-wrap: balance;
+		}
+
+		#intro .hero-copy__title--mobile span {
+			display: block;
+			white-space: nowrap;
+		}
+
+		#intro .hero-copy__title--mobile span:nth-child(2) {
+			transform: translateX(0.7rem);
+		}
+
+		#intro .hero-copy__title--mobile span:nth-child(3) {
+			transform: translateX(0.15rem);
 		}
 
 		#intro .hero-copy__products {
