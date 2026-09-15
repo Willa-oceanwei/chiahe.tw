@@ -20,7 +20,7 @@
     <meta property="og:image" content="https://raw.githubusercontent.com/Willa-oceanwei/chiahe.tw/main/images/product.img.jpg" />
     <meta property="og:site_name" content="佳咊實業有限公司" />
 
-    <link rel="stylesheet" href="assets/css/main.css?v=mobile-home-2" />
+    <link rel="stylesheet" href="assets/css/main.css?v=mobile-home-3" />
     <noscript><link rel="stylesheet" href="assets/css/noscript.css" /></noscript>
 
 </head>
@@ -47,6 +47,11 @@
 
 		<!-- Intro Section -->
 		<section id="intro" class="wrapper style1 fullscreen fade-up">
+			<label class="mobile-view-toggle">
+				<span class="mobile-view-toggle__label">桌機版</span>
+				<input type="checkbox" id="desktop-view-toggle" aria-label="切換完整桌機版內容" />
+				<span class="mobile-view-toggle__track" aria-hidden="true"></span>
+			</label>
 			<div class="hero-brand" aria-label="佳咊實業有限公司">
 				<strong class="hero-brand__name">佳咊實業有限公司</strong>
 				<span class="hero-brand__name-en">CHIA HE INDUSTRIAL CO., LTD.</span>
@@ -220,7 +225,7 @@
 	<script src="assets/js/breakpoints.min.js"></script>
 	<script src="assets/js/util.js"></script>
 	<script src="assets/js/main.js"></script>
-	<script src="assets/js/hero-pigment.js?v=mobile-home-2"></script>
+	<script src="assets/js/hero-pigment.js?v=mobile-home-3"></script>
 
 	<!-- 初始化 scrolly 平滑滾動 -->
 	<script>
@@ -229,6 +234,14 @@
 			speed: 1000,
 			offset: 0
 		});
+
+		const desktopViewToggle = document.getElementById('desktop-view-toggle');
+		if (desktopViewToggle) {
+			desktopViewToggle.addEventListener('change', function() {
+				document.body.classList.toggle('mobile-desktop-view', this.checked);
+				this.setAttribute('aria-checked', String(this.checked));
+			});
+		}
 	});
 	</script>
 

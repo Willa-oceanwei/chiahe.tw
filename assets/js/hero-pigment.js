@@ -13,7 +13,7 @@
     ribbonDuration: 4.4, reformDuration: 4.2,
     collisionIntervalMin: 4.8, collisionIntervalMax: 7.4,
     collisionRadius: 0.145, desktopDprCap: 1.65, mobileDprCap: 1.25,
-    mobilePointScale: 1.35
+    mobilePointScale: 1.35, mobileGlowBoost: 1.45
   };
   const PALETTE = [
     [0.06, 0.86, 0.96], [1.00, 0.14, 0.58], [1.00, 0.78, 0.16],
@@ -138,7 +138,7 @@
     layout(location=0) in vec2 aPosition; layout(location=1) in vec2 aVelocity;
     layout(location=2) in float aSeed; layout(location=3) in float aGroup;
     layout(location=4) in float aKind; layout(location=5) in vec2 aHome;
-    uniform float uAspect,uDpr,uPointMin,uPointMax,uPhase,uEnergy,uTime; uniform vec2 uCore; uniform vec3 uPalette[5];
+    uniform float uAspect,uDpr,uPointMin,uPointMax,uPhase,uEnergy,uTime,uGlowBoost; uniform vec2 uCore; uniform vec3 uPalette[5];
     out vec4 vColour; out float vGlow;
     void main(){
       gl_Position=vec4(aPosition.x*2.0-1.0,1.0-aPosition.y*2.0,0,1);
@@ -157,8 +157,8 @@
       float foreground=smoothstep(.84,.97,fract(aSeed*29.71));
       if(aKind>2.5)foreground*=.40;
       float shimmer=.68+.32*sin(uTime*1.35+aSeed*41.0);
-      vGlow=clamp(foreground*shimmer+newColour*.92+impact*smoothstep(.22,0.0,d)*.58,0.0,1.0);
-      alpha+=newColour*.28+vGlow*.14; gl_PointSize=size*uDpr*(1.0+newColour*.34+foreground*.24); vColour=vec4(colour,alpha);
+      vGlow=clamp((foreground*shimmer+newColour*.92+impact*smoothstep(.22,0.0,d)*.58)*uGlowBoost,0.0,1.0);
+      alpha+=newColour*.28+vGlow*.14+(uGlowBoost-1.0)*.08; gl_PointSize=size*uDpr*(1.0+newColour*.34+foreground*.24); vColour=vec4(colour,alpha);
     }`;
   const RENDER_FRAGMENT = `#version 300 es
     precision mediump float; in vec4 vColour; in float vGlow; out vec4 outColour;
@@ -192,7 +192,7 @@
   function initPrograms(){
     updateProgram=program(UPDATE_VERTEX,PASS_FRAGMENT,['vPosition','vVelocity']); renderProgram=program(RENDER_VERTEX,RENDER_FRAGMENT); backgroundProgram=program(BACKGROUND_VERTEX,BACKGROUND_FRAGMENT);
     updateU=locations(updateProgram,['uTime','uDelta','uAspect','uPhase','uEnergy','uCore','uMouse','uMouseVelocity']);
-    renderU=locations(renderProgram,['uAspect','uDpr','uPointMin','uPointMax','uPhase','uEnergy','uTime','uCore','uPalette[0]']);
+    renderU=locations(renderProgram,['uAspect','uDpr','uPointMin','uPointMax','uPhase','uEnergy','uTime','uGlowBoost','uCore','uPalette[0]']);
     backgroundU=locations(backgroundProgram,['uTime','uAspect','uPhase','uEnergy','uCore','uPalette[0]']); emptyVao=gl.createVertexArray();
   }
   function loadLogoMask(){
@@ -282,7 +282,7 @@
   }
   function draw(phase){
     gl.disable(gl.BLEND);gl.useProgram(backgroundProgram);gl.bindVertexArray(emptyVao);setCommon(backgroundU,phase);gl.uniform1f(backgroundU.uTime,elapsed);gl.uniform3fv(backgroundU['uPalette[0]'],new Float32Array(PALETTE.flat()));gl.drawArrays(gl.TRIANGLES,0,3);
-    gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.useProgram(renderProgram);gl.bindVertexArray(sets[source].vao);setCommon(renderU,phase);gl.uniform1f(renderU.uDpr,dpr*(mobileQuery.matches?CONFIG.mobilePointScale:1));gl.uniform1f(renderU.uPointMin,CONFIG.pointSizeMin);gl.uniform1f(renderU.uPointMax,CONFIG.pointSizeMax);gl.uniform1f(renderU.uTime,elapsed);gl.uniform3fv(renderU['uPalette[0]'],new Float32Array(PALETTE.flat()));gl.drawArrays(gl.POINTS,0,count);
+    gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.useProgram(renderProgram);gl.bindVertexArray(sets[source].vao);setCommon(renderU,phase);gl.uniform1f(renderU.uDpr,dpr*(mobileQuery.matches?CONFIG.mobilePointScale:1));gl.uniform1f(renderU.uPointMin,CONFIG.pointSizeMin);gl.uniform1f(renderU.uPointMax,CONFIG.pointSizeMax);gl.uniform1f(renderU.uGlowBoost,mobileQuery.matches?CONFIG.mobileGlowBoost:1);gl.uniform1f(renderU.uTime,elapsed);gl.uniform3fv(renderU['uPalette[0]'],new Float32Array(PALETTE.flat()));gl.drawArrays(gl.POINTS,0,count);
   }
   function resize(){ if(!logoMask)return;const r=hero.getBoundingClientRect(),nextWidth=Math.max(1,r.width),nextHeight=Math.max(1,r.height),nextDpr=Math.min(devicePixelRatio||1,mobileQuery.matches?CONFIG.mobileDprCap:CONFIG.desktopDprCap),nextCount=mobileQuery.matches?CONFIG.mobileCount:(reducedQuery.matches?CONFIG.reducedMotionCount:CONFIG.desktopCount);if(Math.abs(nextWidth-width)<1&&Math.abs(nextHeight-height)<1&&nextDpr===dpr&&nextCount===count)return;width=nextWidth;height=nextHeight;aspect=width/height;dpr=nextDpr;canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);canvas.style.width=width+'px';canvas.style.height=height+'px';gl.viewport(0,0,canvas.width,canvas.height);initParticles(); }
   function queueResize(){clearTimeout(resizeTimer);resizeTimer=setTimeout(resize,150);}
